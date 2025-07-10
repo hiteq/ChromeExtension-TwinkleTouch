@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TwinkleTouch 설정</title>
+  <style>
+    body {
+      width: 300px;
+      padding: 20px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      margin: 0;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 300;
+    }
+
+    .header .subtitle {
+      font-size: 12px;
+      opacity: 0.8;
+      margin-top: 5px;
+    }
+
+    .control-group {
+      margin-bottom: 15px;
+      padding: 15px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      backdrop-filter: blur(10px);
+    }
+
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 50px;
+      height: 25px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 25px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .toggle-switch.active {
+      background: #4CAF50;
+    }
+
+    .toggle-switch .toggle-knob {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 21px;
+      height: 21px;
+      background: white;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    .toggle-switch.active .toggle-knob {
+      transform: translateX(25px);
+    }
+
+    .status {
+      text-align: center;
+      padding: 10px;
+      margin-top: 15px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .status.enabled {
+      background: rgba(76, 175, 80, 0.3);
+      color: #81C784;
+    }
+
+    .status.disabled {
+      background: rgba(244, 67, 54, 0.3);
+      color: #E57373;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 11px;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>✨ TwinkleTouch</h1>
+    <div class="subtitle">화면 장식 효과</div>
+  </div>
+
+  <div class="control-group">
+    <div class="toggle-container">
+      <span>반짝이는 효과</span>
+      <div class="toggle-switch active" id="toggleSwitch">
+        <div class="toggle-knob"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status enabled" id="status">
+    효과가 활성화되어 있습니다
+  </div>
+
+  <div class="footer">
+    마우스를 움직여서 반짝이는 효과를 확인해보세요!
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html> 
