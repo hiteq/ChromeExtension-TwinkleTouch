@@ -1,151 +1,224 @@
-# TwinkleTouch Chrome Extension
+# TwinkleTouch Chrome Extension ✨
 
-화면에 마우스 추적 및 클릭 효과로 반짝이는 별들을 표시하는 크롬 익스텐션입니다.
+> 웹페이지에 마법 같은 별빛 효과를 추가하는 크롬 익스텐션
 
-## 🌟 기능
+[![CI/CD](https://github.com/USERNAME/TwinkleTouch-ChromeExtension/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/USERNAME/TwinkleTouch-ChromeExtension/actions/workflows/ci-cd.yml)
+[![Version](https://img.shields.io/github/v/release/USERNAME/TwinkleTouch-ChromeExtension?include_prereleases)](https://github.com/USERNAME/TwinkleTouch-ChromeExtension/releases)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-- **마우스 추적**: 마우스 움직임을 따라 별이 생성됩니다
-- **클릭 버스트**: 클릭 시 화려한 별 폭발 효과
-- **터치 지원**: 모바일 및 터치 디바이스 완전 지원
-- **고성능**: Canvas 기반 GPU 가속 렌더링
-- **다양한 색상**: 5가지 아름다운 색상 팔레트
-- **쉬운 토글**: 팝업에서 간단히 켜고 끌 수 있음
+## 🌟 주요 기능
 
-## 📋 설치 방법
+- **✨ 다층 글로우 효과**: HTML5 Canvas 기반의 아름다운 별빛 파티클
+- **🧙‍♂️ 마법사 등급 시스템**: 대마법사/수련생/머글 모드 지원
+- **🎨 5가지 색상**: 흰색, 노란색, 청록색, 자홍색, 초록색 별빛
+- **⚡ 고성능 최적화**: 메모리 최적화 및 배치 렌더링 시스템
+- **📱 터치 지원**: 데스크톱과 모바일 모두 완벽 지원
+- **🔄 실시간 설정**: 팝업에서 즉시 모드 변경 가능
 
-1. 이 저장소를 클론하거나 다운로드
-2. Chrome에서 `chrome://extensions/` 접속
-3. "개발자 모드" 활성화
-4. "압축해제된 확장 프로그램을 로드합니다" 클릭
-5. 다운로드한 폴더 선택
+## 🎮 사용법
 
-## 🎨 브랜치별 버전
+### 모드 설명
 
-### Main Branch (DOM 기반)
-- **기술**: DOM 조작 + CSS 애니메이션
-- **파티클 수**: 최대 100개
-- **렌더링**: SVG + CSS transition
-- **성능**: 중간 (CSS 애니메이션 의존)
-- **호환성**: 모든 브라우저 완전 지원
+| 모드 | 설명 | 효과 |
+|------|------|------|
+| 🧙‍♂️ **대마법사** | 최대 강도 | 마우스 움직임과 클릭에 화려한 별빛 폭발 |
+| 🧙‍♀️ **수련생** | 중간 강도 | 적당한 수준의 별빛 효과 |
+| 👤 **머글** | 비활성화 | 효과 없음 |
 
-### Canvas-Optimization Branch (Canvas 기반) ⚡
-- **기술**: HTML5 Canvas + requestAnimationFrame
-- **파티클 수**: 최대 200개 (2배 증가)
-- **렌더링**: Path2D + GPU 가속
-- **성능**: 고성능 (10배 향상)
-- **메모리**: 효율적인 객체 풀링
+### 조작법
 
-## 🚀 Canvas 버전 성능 개선사항
+- **마우스 움직임**: 커서를 따라 별빛이 생성됩니다
+- **클릭**: 클릭 위치에서 별빛 폭발 효과
+- **터치** (모바일): 터치와 스와이프로 별빛 생성
 
-### 렌더링 최적화
-- **GPU 가속**: Canvas 하드웨어 가속 활용
-- **Path2D 캐싱**: 별 모양 재사용으로 CPU 부하 감소
-- **고해상도 지원**: Retina 디스플레이 최적화
-- **프레임 최적화**: 60fps 안정적 유지
+## 🛠️ 설치 방법
 
-### 메모리 최적화
-- **객체 풀링**: 파티클 재사용으로 GC 압박 최소화
-- **스마트 캐싱**: 경로 및 그래픽 리소스 캐싱
-- **동적 할당 제거**: 런타임 메모리 할당 최소화
+### Chrome Web Store에서 설치 (권장)
+*자동 배포 시스템을 통해 곧 출시됩니다*
 
-### 성능 비교
+> **Note**: Chrome Web Store 자동 배포는 초기 수동 등록 후 활성화됩니다.  
+> 자세한 설정 방법은 [Chrome Web Store 배포 가이드](docs/CHROME_WEBSTORE_SETUP.md)를 참조하세요.
 
-| 항목 | DOM 버전 | Canvas 버전 | 개선율 |
-|------|----------|-------------|--------|
-| 최대 파티클 | 100개 | 200개 | +100% |
-| CPU 사용률 | 높음 | 낮음 | -70% |
-| 메모리 사용량 | 가변적 | 안정적 | -50% |
-| 렌더링 성능 | 중간 | 매우 높음 | +900% |
-| 프레임 드롭 | 자주 발생 | 거의 없음 | -95% |
+### 수동 설치 (개발자용)
 
-## 🛠️ 기술 스택
+1. **릴리스 다운로드**
+   ```bash
+   # 최신 릴리스에서 ZIP 파일 다운로드
+   # https://github.com/USERNAME/TwinkleTouch-ChromeExtension/releases
+   ```
 
-### Canvas 버전 핵심 기술
-- **HTML5 Canvas**: 고성능 2D 렌더링
-- **Path2D API**: 벡터 그래픽 최적화
-- **requestAnimationFrame**: 부드러운 애니메이션
-- **Object Pooling**: 메모리 효율성
-- **GPU 가속**: 하드웨어 가속 활용
+2. **Chrome에서 설치**
+   - Chrome에서 `chrome://extensions/` 페이지 열기
+   - 우측 상단 "개발자 모드" 활성화
+   - "압축해제된 확장 프로그램을 로드합니다" 클릭
+   - 압축을 푼 확장 프로그램 폴더 선택
 
-### 파티클 시스템
-```javascript
-class Particle {
-  // 생명주기: reset() → update() → render()
-  // 물리: 중력, 회전, 페이드 아웃
-  // 최적화: 풀링, 재사용, 캐싱
-}
-```
+3. **사용 시작**
+   - 확장 프로그램 아이콘 클릭
+   - 원하는 마법사 등급 선택
+   - 웹페이지에서 마우스를 움직이거나 클릭해보세요!
 
-### 별 모양 렌더링
-```javascript
-// 4방향 별 모양 (Path2D 캐싱)
-const starPath = new Path2D();
-// 위, 오른쪽, 아래, 왼쪽 포인트로 구성
-```
+## 🔧 개발 환경 설정
 
-## 📱 호환성
+### 필요 조건
+- Node.js 18.0.0 이상
+- npm 또는 yarn
+- Chrome 브라우저
 
-- **Chrome**: 완전 지원 (권장)
-- **Firefox**: 부분 지원
-- **Safari**: 기본 지원
-- **Edge**: 완전 지원
-- **모바일**: 터치 이벤트 지원
-
-## 🎯 사용법
-
-1. 확장 프로그램 설치 후 웹페이지 방문
-2. 마우스를 움직이면 별이 따라옵니다
-3. 클릭하면 버스트 효과가 나타납니다
-4. 확장 프로그램 아이콘 클릭으로 켜기/끄기
-
-## 🔧 개발 모드
+### 설치 및 실행
 
 ```bash
-# Canvas 최적화 브랜치로 전환
-git checkout canvas-optimization
+# 저장소 클론
+git clone https://github.com/USERNAME/TwinkleTouch-ChromeExtension.git
+cd TwinkleTouch-ChromeExtension
 
-# 개발 서버 없이 직접 로드
-chrome://extensions/ → 개발자 모드 → 압축해제된 확장프로그램 로드
+# 의존성 설치
+npm install
+
+# 코드 검사
+npm run lint
+
+# 테스트 실행
+npm test
+
+# Extension 패키징
+npm run package
 ```
 
-## 📊 성능 프로파일링
+### 개발용 스크립트
 
-Canvas 버전에서는 다음 최적화 기법을 사용합니다:
+```bash
+# 코드 검사 및 자동 수정
+npm run lint:fix
 
-1. **배치 렌더링**: 모든 파티클을 한 번에 렌더링
-2. **더티 리전**: 변경된 영역만 다시 그리기
-3. **오프스크린 캔버스**: 백그라운드 렌더링 준비
-4. **웹워커 지원**: 메인 스레드 부하 분산 (향후 계획)
+# Playwright 테스트 (UI 모드)
+npm run test:ui
 
-## 🎨 커스터마이징
+# Manifest.json 검증
+npm run validate
 
-색상 팔레트는 `content.js`에서 쉽게 변경 가능합니다:
-
-```javascript
-this.colors = [
-  { r: 255, g: 215, b: 0 },   // 금색
-  { r: 255, g: 105, b: 180 }, // 핫핑크
-  { r: 0, g: 191, b: 255 },   // 스카이블루
-  { r: 152, g: 251, b: 152 }, // 연두색
-  { r: 221, g: 160, b: 221 }  // 자주색
-];
+# 전체 빌드 (린트 + 테스트)
+npm run build
 ```
 
-## 📈 성능 모니터링
+## 🏗️ 프로젝트 구조
 
-Canvas 버전은 다음 메트릭을 제공합니다:
-- 활성 파티클 수
-- 프레임 레이트 (FPS)
-- 메모리 사용량
-- GPU 사용률
+```
+TwinkleTouch-ChromeExtension/
+├── 📄 manifest.json          # Chrome Extension 설정
+├── ⚡ content.js             # 메인 컨텐츠 스크립트
+├── 🎨 popup.html             # 팝업 UI
+├── 📱 popup.js               # 팝업 로직
+├── 🎯 styles.css             # 스타일시트
+├── 🧪 tests/                 # Playwright 테스트
+├── 🔧 scripts/               # 빌드 스크립트
+├── 🚀 .github/workflows/     # CI/CD 설정
+└── 📦 build/                 # 빌드 결과물
+```
 
-## 🔮 향후 계획
+## 🚀 CI/CD 파이프라인
 
-- **WebGL 버전**: 더 높은 성능을 위한 3D 가속
-- **웹워커**: 백그라운드 처리로 메인 스레드 최적화
-- **설정 UI**: 파티클 수, 색상 등 사용자 정의
-- **테마 시스템**: 다양한 시각적 효과
+GitHub Actions를 통한 자동화된 워크플로우:
+
+### 트리거
+- `main` 브랜치에 push
+- `main` 브랜치로 PR
+- 릴리스 생성
+
+### 워크플로우 단계
+
+1. **테스트 및 품질 검사**
+   - ESLint 코드 검사
+   - Extension 파일 구조 검증
+   - Manifest.json 유효성 검증
+   - Playwright 자동화 테스트
+
+2. **자동 버전 관리**
+   - Semantic versioning (patch 자동 증가)
+   - package.json 및 manifest.json 동기화
+   - 자동 커밋 및 푸시
+
+3. **빌드 및 패키징**
+   - Extension ZIP 파일 생성
+   - 릴리스 노트 자동 생성
+   - 아티팩트 업로드
+
+4. **릴리스 배포**
+   - GitHub 릴리스 자동 생성
+   - ZIP 파일 첨부
+   - 태그 생성
+
+5. **Chrome Web Store 배포** (선택적)
+   - 자동 업로드 및 게시
+   - OAuth 2.0 인증을 통한 안전한 배포
+   - 설정 방법: [배포 가이드](docs/CHROME_WEBSTORE_SETUP.md)
+
+6. **브랜치 동기화**
+   - develop 브랜치 자동 업데이트
+
+## 🧪 테스트
+
+### 자동화 테스트
+- **Playwright**: Extension 로딩 및 기능 테스트
+- **ESLint**: 코드 품질 검사
+- **Manifest 검증**: Extension 설정 유효성 검사
+
+### 테스트 실행
+```bash
+# 전체 테스트 실행
+npm test
+
+# 특정 테스트 파일 실행
+npx playwright test tests/debug-extension.spec.js
+
+# 헤드리스 모드 비활성화 (브라우저 UI 표시)
+npm run test:headed
+```
+
+## 📊 성능 최적화
+
+### Canvas 렌더링 최적화
+- **배치 렌더링**: 동일한 속성의 파티클을 그룹화
+- **뷰포트 컬링**: 화면 밖 파티클 제거
+- **메모리 풀링**: 객체 재사용으로 GC 압박 감소
+- **적응형 품질 제어**: FPS에 따른 동적 품질 조절
+
+### 브라우저 호환성
+- Chrome 88+ (Manifest V3)
+- Edge 88+
+- Opera 74+
+
+## 🤝 기여 방법
+
+1. **Fork** 이 저장소
+2. **Feature 브랜치** 생성 (`git checkout -b feature/amazing-feature`)
+3. **변경사항 커밋** (`git commit -m 'Add amazing feature'`)
+4. **브랜치에 Push** (`git push origin feature/amazing-feature`)
+5. **Pull Request** 생성
+
+### 기여 가이드라인
+- ESLint 규칙 준수
+- 모든 테스트 통과
+- 커밋 메시지는 [Conventional Commits](https://www.conventionalcommits.org/) 형식
+
+## 🐛 버그 신고
+
+버그나 기능 요청은 [Issues](https://github.com/USERNAME/TwinkleTouch-ChromeExtension/issues) 페이지에서 신고해주세요.
+
+## 📝 변경 로그
+
+모든 변경사항은 [Releases](https://github.com/USERNAME/TwinkleTouch-ChromeExtension/releases) 페이지에서 확인할 수 있습니다.
+
+## 📄 라이선스
+
+이 프로젝트는 [MIT 라이선스](LICENSE) 하에 배포됩니다.
+
+## ⭐ 지원
+
+이 프로젝트가 도움이 되었다면 ⭐ Star를 눌러주세요!
 
 ---
 
-**Made with ❤️ for a more beautiful web experience** 
+<div align="center">
+Made with ✨ by TwinkleTouch Team
+</div> 
