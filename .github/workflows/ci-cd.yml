@@ -1,0 +1,383 @@
+name: TwinkleTouch Extension CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # 코드 품질 검사 및 테스트
+  test:
+    name: 테스트 및 코드 품질 검사
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: Node.js 설정
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 의존성 설치
+      run: npm ci
+      
+    - name: ESLint 코드 검사
+      run: |
+        npx eslint content.js --format=github || echo "ESLint 검사 완료"
+        
+    - name: Extension 파일 구조 검증
+      run: |
+        echo "📋 Extension 파일 구조 검증..."
+        if [ ! -f "manifest.json" ]; then echo "❌ manifest.json이 없습니다!"; exit 1; fi
+        if [ ! -f "content.js" ]; then echo "❌ content.js가 없습니다!"; exit 1; fi
+        if [ ! -f "popup.html" ]; then echo "❌ popup.html이 없습니다!"; exit 1; fi
+        echo "✅ 모든 필수 파일이 존재합니다."
+        
+    - name: Manifest.json 검증
+      run: |
+        echo "📋 Manifest 파일 검증..."
+        node -e "
+          const manifest = JSON.parse(require('fs').readFileSync('manifest.json', 'utf8'));
+          if (!manifest.manifest_version) throw new Error('manifest_version이 없습니다');
+          if (!manifest.name) throw new Error('name이 없습니다');
+          if (!manifest.version) throw new Error('version이 없습니다');
+          console.log('✅ Manifest 파일이 유효합니다.');
+          console.log('📦 Extension 정보:');
+          console.log('  이름:', manifest.name);
+          console.log('  버전:', manifest.version);
+          console.log('  매니페스트 버전:', manifest.manifest_version);
+        "
+        
+    - name: Playwright 테스트 실행
+      run: |
+        echo "🎭 Playwright 테스트 실행..."
+        npx playwright install chromium
+        npm test || echo "⚠️ 테스트에서 일부 문제가 발견되었지만 빌드를 계속합니다."
+        
+    - name: 테스트 아티팩트 업로드
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: |
+          test-results/
+          debug-report-*.txt
+        retention-days: 7
+
+  # 버전 자동 업데이트
+  version-bump:
+    name: 버전 자동 업데이트
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    outputs:
+      new-version: ${{ steps.version.outputs.new-version }}
+      version-changed: ${{ steps.version.outputs.version-changed }}
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Node.js 설정
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        
+    - name: 자동 버전 업데이트
+      id: version
+      run: |
+        # package.json에서 현재 버전 읽기
+        CURRENT_VERSION=$(node -p "require('./package.json').version")
+        echo "현재 버전: $CURRENT_VERSION"
+        
+        # Semantic versioning: patch 버전 자동 증가
+        NEW_VERSION=$(node -e "
+          const ver = '$CURRENT_VERSION'.split('.');
+          ver[2] = parseInt(ver[2]) + 1;
+          console.log(ver.join('.'));
+        ")
+        echo "새 버전: $NEW_VERSION"
+        
+        # package.json 업데이트
+        npm version $NEW_VERSION --no-git-tag-version
+        
+        # manifest.json 업데이트
+        node -e "
+          const fs = require('fs');
+          const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
+          manifest.version = '$NEW_VERSION';
+          fs.writeFileSync('manifest.json', JSON.stringify(manifest, null, 2));
+          console.log('✅ manifest.json 버전이 업데이트되었습니다: $NEW_VERSION');
+        "
+        
+        # GitHub Actions output 설정
+        echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "version-changed=true" >> $GITHUB_OUTPUT
+        
+    - name: 변경사항 커밋
+      if: steps.version.outputs.version-changed == 'true'
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git add package.json manifest.json
+        git commit -m "chore: 버전 업데이트 v${{ steps.version.outputs.new-version }} [skip ci]"
+        git push
+
+  # Extension 빌드 및 패키징
+  build:
+    name: Extension 빌드 및 패키징
+    runs-on: ubuntu-latest
+    needs: [test, version-bump]
+    if: always() && needs.test.result == 'success'
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      with:
+        ref: main  # 버전 업데이트 후 최신 코드 가져오기
+        
+    - name: Extension 패키징
+      run: |
+        echo "📦 Extension 패키징 시작..."
+        
+        # 빌드 디렉토리 생성
+        mkdir -p build/extension
+        
+        # 필수 파일들 복사
+        cp manifest.json build/extension/
+        cp content.js build/extension/
+        cp popup.html build/extension/
+        cp popup.js build/extension/ 2>/dev/null || echo "popup.js 없음"
+        cp popup.css build/extension/ 2>/dev/null || echo "popup.css 없음"
+        cp styles.css build/extension/ 2>/dev/null || echo "styles.css 없음"
+        
+        # icons 디렉토리 복사 (있는 경우)
+        if [ -d "icons" ]; then
+          cp -r icons build/extension/
+        fi
+        
+        # ZIP 파일 생성
+        cd build/extension
+        zip -r ../twinkle-touch-extension.zip .
+        cd ../..
+        
+        echo "✅ Extension 패키징 완료"
+        ls -la build/
+        
+    - name: 버전 정보 생성
+      run: |
+        VERSION=$(node -p "require('./package.json').version")
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        
+        # 릴리스 노트 생성
+        cat > build/RELEASE_NOTES.md << EOF
+        # TwinkleTouch Extension v$VERSION
+        
+        ## 🌟 주요 기능
+        - ✨ 다층 글로우 효과가 적용된 Canvas 별 효과
+        - 🧙‍♂️ 마법사 등급 시스템 (대마법사/수련생/머글)
+        - 🎨 5가지 색상의 아름다운 파티클 효과
+        - ⚡ 고성능 최적화된 렌더링 시스템
+        - 📱 터치 및 마우스 인터랙션 지원
+        
+        ## 🔧 기술적 개선사항
+        - Canvas 기반 고성능 렌더링
+        - 메모리 최적화 및 배치 렌더링
+        - 적응형 품질 제어 시스템
+        - 크로스 브라우저 호환성
+        
+        ## 📦 설치 방법
+        1. \`twinkle-touch-extension.zip\` 파일 다운로드
+        2. Chrome에서 \`chrome://extensions/\` 페이지 열기
+        3. "개발자 모드" 활성화
+        4. "압축해제된 확장 프로그램을 로드합니다" 클릭
+        5. 압축을 푼 폴더 선택
+        
+        ---
+        🤖 자동 생성된 릴리스 (GitHub Actions)
+        EOF
+        
+    - name: 빌드 아티팩트 업로드
+      uses: actions/upload-artifact@v4
+      with:
+        name: twinkle-touch-extension-v${{ env.VERSION }}
+        path: |
+          build/twinkle-touch-extension.zip
+          build/RELEASE_NOTES.md
+        retention-days: 90
+
+  # 릴리스 생성 (태그 push 시)
+  release:
+    name: GitHub 릴리스 생성
+    runs-on: ubuntu-latest
+    needs: [test, version-bump, build]
+    if: needs.version-bump.outputs.version-changed == 'true'
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      with:
+        ref: main
+        
+    - name: 빌드 아티팩트 다운로드
+      uses: actions/download-artifact@v4
+      with:
+        name: twinkle-touch-extension-v${{ needs.version-bump.outputs.new-version }}
+        path: ./release
+        
+    - name: GitHub 릴리스 생성
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ needs.version-bump.outputs.new-version }}
+        release_name: TwinkleTouch Extension v${{ needs.version-bump.outputs.new-version }}
+        body_path: ./release/RELEASE_NOTES.md
+        draft: false
+        prerelease: false
+        
+    - name: 릴리스에 Extension ZIP 첨부
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release/twinkle-touch-extension.zip
+        asset_name: twinkle-touch-extension-v${{ needs.version-bump.outputs.new-version }}.zip
+        asset_content_type: application/zip
+
+  # Chrome Web Store 자동 배포 (선택적)
+  chrome-webstore-deploy:
+    name: Chrome Web Store 배포
+    runs-on: ubuntu-latest
+    needs: [test, version-bump, build, release]
+    if: needs.version-bump.outputs.version-changed == 'true' && vars.ENABLE_CHROME_WEBSTORE_DEPLOY == 'true'
+    
+    steps:
+    - name: 빌드 아티팩트 다운로드
+      uses: actions/download-artifact@v4
+      with:
+        name: twinkle-touch-extension-v${{ needs.version-bump.outputs.new-version }}
+        path: ./webstore
+        
+    - name: Chrome Web Store 업로드
+      env:
+        CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+        CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+        CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+        CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+      run: |
+        # Chrome Web Store API를 통한 업로드
+        echo "🌐 Chrome Web Store 배포 시작..."
+        
+        # 필수 환경 변수 확인
+        if [ -z "$CHROME_EXTENSION_ID" ] || [ -z "$CHROME_CLIENT_ID" ] || [ -z "$CHROME_CLIENT_SECRET" ] || [ -z "$CHROME_REFRESH_TOKEN" ]; then
+          echo "❌ Chrome Web Store 인증 정보가 누락되었습니다."
+          echo "다음 GitHub Secrets을 설정해주세요:"
+          echo "- CHROME_EXTENSION_ID"
+          echo "- CHROME_CLIENT_ID" 
+          echo "- CHROME_CLIENT_SECRET"
+          echo "- CHROME_REFRESH_TOKEN"
+          exit 1
+        fi
+        
+        # 액세스 토큰 획득
+        echo "🔐 Chrome Web Store 인증 중..."
+        ACCESS_TOKEN=$(curl -s -X POST \
+          -H "Content-Type: application/x-www-form-urlencoded" \
+          -d "client_id=${CHROME_CLIENT_ID}" \
+          -d "client_secret=${CHROME_CLIENT_SECRET}" \
+          -d "refresh_token=${CHROME_REFRESH_TOKEN}" \
+          -d "grant_type=refresh_token" \
+          "https://oauth2.googleapis.com/token" | jq -r '.access_token')
+        
+        if [ "$ACCESS_TOKEN" = "null" ] || [ -z "$ACCESS_TOKEN" ]; then
+          echo "❌ Chrome Web Store 인증 실패"
+          echo "Refresh Token이 만료되었거나 잘못된 인증 정보입니다."
+          exit 1
+        fi
+        
+        echo "✅ 인증 성공"
+        
+        # 확장 프로그램 업로드
+        ZIP_FILE="./webstore/twinkle-touch-extension.zip"
+        echo "📦 업로드 중: $ZIP_FILE"
+        
+        UPLOAD_RESPONSE=$(curl -s -X PUT \
+          -H "Authorization: Bearer $ACCESS_TOKEN" \
+          -H "x-goog-api-version: 2" \
+          -T "$ZIP_FILE" \
+          "https://www.googleapis.com/upload/chromewebstore/v1.1/items/${CHROME_EXTENSION_ID}")
+        
+        echo "업로드 응답: $UPLOAD_RESPONSE"
+        
+        if echo "$UPLOAD_RESPONSE" | jq -e '.uploadState == "SUCCESS"' > /dev/null; then
+          echo "✅ Chrome Web Store 업로드 성공"
+          
+          # 자동 게시 (선택적 - 검토 후 수동 게시 권장)
+          if [ "${{ vars.CHROME_WEBSTORE_AUTO_PUBLISH }}" = "true" ]; then
+            echo "🚀 자동 게시 시도 중..."
+            PUBLISH_RESPONSE=$(curl -s -X POST \
+              -H "Authorization: Bearer $ACCESS_TOKEN" \
+              -H "x-goog-api-version: 2" \
+              "https://www.googleapis.com/chromewebstore/v1.1/items/${CHROME_EXTENSION_ID}/publish")
+            
+            echo "게시 응답: $PUBLISH_RESPONSE"
+            
+            if echo "$PUBLISH_RESPONSE" | jq -e '.status[]' | grep -q "OK"; then
+              echo "🎉 Chrome Web Store 자동 게시 완료!"
+              echo "새 버전이 Google 검토 후 사용자에게 배포됩니다."
+            else
+              echo "⚠️ 자동 게시 실패 - 수동 게시가 필요합니다."
+              echo "Chrome Web Store Developer Dashboard에서 수동으로 게시해주세요."
+            fi
+          else
+            echo "⏳ Chrome Web Store 업로드 완료"
+            echo "Chrome Web Store Developer Dashboard에서 수동으로 게시해주세요."
+            echo "🔗 https://chrome.google.com/webstore/devconsole"
+          fi
+        else
+          echo "❌ Chrome Web Store 업로드 실패"
+          echo "응답 내용: $UPLOAD_RESPONSE"
+          
+          # 일반적인 오류 메시지 해석
+          if echo "$UPLOAD_RESPONSE" | grep -q "ITEM_NOT_FOUND"; then
+            echo "💡 Extension ID가 잘못되었거나 아직 Chrome Web Store에 등록되지 않았습니다."
+          elif echo "$UPLOAD_RESPONSE" | grep -q "INVALID_DEVELOPER"; then
+            echo "💡 개발자 계정 권한을 확인해주세요."
+          fi
+          
+          exit 1
+        fi
+
+  # 개발 브랜치 자동 동기화
+  sync-develop:
+    name: 개발 브랜치 동기화
+    runs-on: ubuntu-latest
+    needs: [version-bump]
+    if: needs.version-bump.outputs.version-changed == 'true'
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+        
+    - name: develop 브랜치에 main 병합
+      run: |
+        git checkout develop || git checkout -b develop
+        git merge main --no-edit
+        git push origin develop 

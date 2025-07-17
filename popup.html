@@ -1,127 +1,239 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TwinkleTouch 설정</title>
+  <title>Arcane Touch Configuration</title>
   <style>
+    /* CSS 시스템 컬러 스킴 지원 */
+    :root {
+      color-scheme: light dark;
+    }
+
     body {
-      width: 300px;
-      padding: 20px;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
+      width: 320px;
+      height: 240px;
+      padding: 0;
       margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: light-dark(#ffffff, #1a1a1a);
+      color: light-dark(#1a1a1a, #ffffff);
+      display: flex;
+      flex-direction: column;
+      border-radius: 12px;
+      overflow: hidden;
     }
 
     .header {
+      padding: 16px 20px;
       text-align: center;
-      margin-bottom: 20px;
+      border-bottom: 1px solid light-dark(#e5e5e5, #2a2a2a);
+      background: light-dark(#fafafa, #111111);
     }
 
     .header h1 {
       margin: 0;
-      font-size: 20px;
-      font-weight: 300;
-    }
-
-    .header .subtitle {
-      font-size: 12px;
-      opacity: 0.8;
-      margin-top: 5px;
-    }
-
-    .control-group {
-      margin-bottom: 15px;
-      padding: 15px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 10px;
-      backdrop-filter: blur(10px);
-    }
-
-    .toggle-container {
+      font-size: 16px;
+      font-weight: 600;
+      color: light-dark(#1a1a1a, #ffffff);
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: center;
+      gap: 6px;
     }
 
-    .toggle-switch {
-      position: relative;
-      width: 50px;
-      height: 25px;
-      background: rgba(255, 255, 255, 0.3);
-      border-radius: 25px;
-      cursor: pointer;
-      transition: all 0.3s ease;
+    .header .icon {
+      font-size: 18px;
     }
 
-    .toggle-switch.active {
-      background: #4CAF50;
+    .content {
+      flex: 1;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
 
-    .toggle-switch .toggle-knob {
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 21px;
-      height: 21px;
-      background: white;
-      border-radius: 50%;
-      transition: all 0.3s ease;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    /* 마법사 등급 탭 시스템 */
+    .wizard-tabs {
+      display: flex;
+      background: light-dark(#f0f0f0, #2a2a2a);
+      border-radius: 10px;
+      padding: 3px;
+      gap: 2px;
     }
 
-    .toggle-switch.active .toggle-knob {
-      transform: translateX(25px);
-    }
-
-    .status {
-      text-align: center;
-      padding: 10px;
-      margin-top: 15px;
-      border-radius: 8px;
-      font-size: 14px;
-    }
-
-    .status.enabled {
-      background: rgba(76, 175, 80, 0.3);
-      color: #81C784;
-    }
-
-    .status.disabled {
-      background: rgba(244, 67, 54, 0.3);
-      color: #E57373;
-    }
-
-    .footer {
-      text-align: center;
-      margin-top: 20px;
+    .wizard-tab {
+      flex: 1;
+      background: transparent;
+      border: none;
+      border-radius: 7px;
+      padding: 10px 6px;
       font-size: 11px;
-      opacity: 0.7;
+      font-weight: 500;
+      color: light-dark(#666666, #999999);
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    .wizard-tab:hover {
+      background: light-dark(#e0e0e0, #3a3a3a);
+      color: light-dark(#333333, #cccccc);
+    }
+
+    .wizard-tab.active {
+      background: light-dark(#ffffff, #1a1a1a);
+      color: light-dark(#1a1a1a, #ffffff);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+    }
+
+    .wizard-tab.active:hover {
+      background: light-dark(#ffffff, #1a1a1a);
+    }
+
+    .wizard-icon {
+      font-size: 16px;
+    }
+
+    .wizard-name {
+      font-weight: 600;
+      font-size: 10px;
+    }
+
+    /* 상태 표시 - 간결하게 */
+    .status {
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      text-align: center;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      border: 1px solid;
+    }
+
+    .status.muggle {
+      background: light-dark(#F9FAFB, #1F2937);
+      color: light-dark(#6B7280, #9CA3AF);
+      border-color: light-dark(#E5E7EB, #374151);
+    }
+
+    .status.apprentice {
+      background: light-dark(#FEF3C7, #1F2937);
+      color: light-dark(#D97706, #F59E0B);
+      border-color: light-dark(#F59E0B, #92400E);
+    }
+
+    .status.archmage {
+      background: light-dark(#EDE9FE, #1E1B4B);
+      color: light-dark(#7C3AED, #A78BFA);
+      border-color: light-dark(#8B5CF6, #6D28D9);
+    }
+
+    /* 크레딧 섹션 */
+    .footer {
+      padding: 12px 20px;
+      text-align: center;
+      border-top: 1px solid light-dark(#e5e5e5, #2a2a2a);
+      background: light-dark(#fafafa, #111111);
+    }
+
+    .credits {
+      font-size: 10px;
+      color: light-dark(#666666, #999999);
+      line-height: 1.4;
+    }
+
+    .credits a {
+      color: light-dark(#007AFF, #0A84FF);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .credits a:hover {
+      text-decoration: underline;
+    }
+
+    /* 반응형 애니메이션 */
+    * {
+      box-sizing: border-box;
+    }
+
+    .wizard-tab:active {
+      transform: scale(0.98);
+    }
+
+    /* 접근성 개선 */
+    .wizard-tab:focus-visible {
+      outline: 2px solid light-dark(#007AFF, #0A84FF);
+      outline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        transition: none !important;
+      }
+    }
+
+    /* 특별 효과 */
+    .wizard-tab.active .wizard-icon {
+      animation: sparkle 2s ease-in-out infinite;
+    }
+
+    @keyframes sparkle {
+      0%, 100% { transform: scale(1) rotate(0deg); }
+      50% { transform: scale(1.1) rotate(5deg); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .wizard-tab.active .wizard-icon {
+        animation: none;
+      }
     }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>✨ TwinkleTouch</h1>
-    <div class="subtitle">화면 장식 효과</div>
+    <h1>
+      <span class="icon">✨</span>
+      Arcane Touch
+    </h1>
   </div>
 
-  <div class="control-group">
-    <div class="toggle-container">
-      <span>반짝이는 효과</span>
-      <div class="toggle-switch active" id="toggleSwitch">
-        <div class="toggle-knob"></div>
-      </div>
+  <div class="content">
+    <div class="wizard-tabs" role="tablist" aria-label="마법사 등급 선택">
+      <button class="wizard-tab" id="muggleTab" data-mode="muggle" role="tab" aria-selected="false" aria-controls="mugglePanel">
+        <div class="wizard-icon" aria-hidden="true">🧑‍💼</div>
+        <div class="wizard-name">Muggle</div>
+      </button>
+      
+      <button class="wizard-tab" id="apprenticeTab" data-mode="apprentice" role="tab" aria-selected="false" aria-controls="apprenticePanel">
+        <div class="wizard-icon" aria-hidden="true">🎓</div>
+        <div class="wizard-name">Apprentice</div>
+      </button>
+      
+      <button class="wizard-tab active" id="archmageTab" data-mode="archmage" role="tab" aria-selected="true" aria-controls="archmagePanel">
+        <div class="wizard-icon" aria-hidden="true">🧙‍♂️</div>
+        <div class="wizard-name">Archmage</div>
+      </button>
+    </div>
+
+    <div class="status archmage" id="status">
+      Spell matrix at full resonance
     </div>
   </div>
 
-  <div class="status enabled" id="status">
-    효과가 활성화되어 있습니다
-  </div>
-
   <div class="footer">
-    마우스를 움직여서 반짝이는 효과를 확인해보세요!
+    <div class="credits">
+      Made by <a href="https://github.com/hiteq" target="_blank" rel="noopener noreferrer">Heetaek Woo</a>.
+      <br>
+      Inspired from <a href="https://x.com/cmzw_" target="_blank" rel="noopener noreferrer">celestialmaze</a>
+    </div>
   </div>
 
   <script src="popup.js"></script>
