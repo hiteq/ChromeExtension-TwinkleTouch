@@ -8,7 +8,7 @@
     width: 100vw !important;
     height: 100vh !important;
     pointer-events: none !important;
-    z-index: 2147483647 !important;
+    z-index: 999999 !important; /* 보안 개선: 최대값 대신 안전한 값 사용 */
     background: transparent !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -33,7 +33,7 @@
     width: 100vw !important;
     height: 100vh !important;
     pointer-events: none !important;
-    z-index: 2147483647 !important;
+    z-index: 999999 !important; /* 보안 개선: 최대값 대신 안전한 값 사용 */
     overflow: hidden !important;
     margin: 0 !important;
     padding: 0 !important;
