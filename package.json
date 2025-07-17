@@ -1,0 +1,49 @@
+{
+  "name": "twinkletouch-chromeextension",
+  "version": "1.0.0",
+  "description": "화면에 마우스 추적 및 클릭 효과로 반짝이는 별들을 표시하는 크롬 익스텐션입니다.",
+  "main": "content.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report",
+    "lint": "eslint content.js tests/**/*.js",
+    "lint:fix": "eslint content.js tests/**/*.js --fix",
+    "build": "npm run lint && npm run test",
+    "release": "npm version patch && git push --follow-tags",
+    "package": "node scripts/package-extension.js",
+    "validate": "node scripts/validate-manifest.js",
+    "check-webstore": "node scripts/check-webstore-setup.js"
+  },
+  "keywords": [
+    "chrome-extension",
+    "sparkle",
+    "effects",
+    "canvas",
+    "webgl",
+    "animation",
+    "particle-effects",
+    "magical",
+    "twinkle"
+  ],
+  "author": "TwinkleTouch Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.53.2",
+    "playwright": "^1.53.2",
+    "eslint": "^8.57.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/USERNAME/TwinkleTouch-ChromeExtension.git"
+  },
+  "bugs": {
+    "url": "https://github.com/USERNAME/TwinkleTouch-ChromeExtension/issues"
+  },
+  "homepage": "https://github.com/USERNAME/TwinkleTouch-ChromeExtension#readme"
+}
