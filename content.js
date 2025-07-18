@@ -1601,7 +1601,7 @@ if (document.readyState === 'loading') {0) return;
   startMemoryCleanup() {
     setInterval(() => {
       // 캐시 크기 제한
-      if (this.starPathCache.size > 50) {
+      if (this.starPathCache && this.starPathCache.size > 50) {
         this.starPathCache.clear();
       }
       
@@ -1879,11 +1879,11 @@ if (document.readyState === 'loading') {0) return;
       keysToDelete.forEach(key => this.starPathCache.delete(key));
     }
 
-    if (this.geometryCache.size > 50) {
+    if (this.geometryCache && this.geometryCache.size > 50) {
       this.geometryCache.clear();
     }
 
-    if (this.transformCache.size > 100) {
+    if (this.transformCache && this.transformCache.size > 100) {
       this.transformCache.clear();
     }
 
