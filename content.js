@@ -1,7 +1,7 @@
 // TwinkleTouch Chrome Extension - Canvas-based Content Script (마법사 등급 시스템)
 console.log('TwinkleTouch Canvas 마법사 등급 버전이 로드되었습니다!');
 
-let isActive = false;
+let isActive = true; // 기본값을 true로 변경
 let sparkleSystem = null;
 let effectLevel = 1.0; // 마법사 등급별 효과 강도 (0: 머글, 0.33: 수련생, 1.0: 대마법사)
 let wizardMode = 'archmage'; // 현재 마법사 등급
@@ -108,23 +108,19 @@ class CanvasSparkle {
   }
 
   getScale() {
-    if (this.scaleCached > 0) return this.scaleCached;
-
     const progress = this.animationProgress;
     this.scaleCached = progress < 0.5 ?
       progress * 2 :
       2 - (progress * 2);
 
-    return this.scaleCached;
+    return Math.max(0.1, this.scaleCached); // 최소값 보장
   }
 
   getAlpha() {
-    if (this.alphaCached > 0) return this.alphaCached;
-
     const progress = this.animationProgress;
     this.alphaCached = progress < 0.8 ? 1 : (1 - progress) / 0.2;
 
-    return this.alphaCached;
+    return Math.max(0.1, this.alphaCached); // 최소값 보장
   }
 
   getBoundingBox() {
@@ -204,6 +200,26 @@ class CanvasSparkleSystem {
     this.visibleSparkles = [];
     this.memoryCleanupInterval = 30000; // 30초마다 메모리 정리
     this.MAX_SPARKLES = 100;
+
+    // 색상 배열 정의 (중요!)
+    this.colors = {
+      white: '#ffffff',
+      yellow: '#ffff00',
+      cyan: '#00ffff',
+      magenta: '#ff00ff',
+      lime: '#00ff00'
+    };
+    this.colorKeys = Object.keys(this.colors);
+
+    // 마우스 위치 초기화
+    this.pointerX = window.innerWidth / 2;
+    this.pointerY = window.innerHeight / 2;
+
+    // 스파클 생성 관련 상수
+    this.CLICK_BURST_COUNT = 60;
+    this.NORMAL_MAX_ACTIVE = 30;
+    this.SPARKLE_THROTTLE = 16; // 16ms (60fps)
+    this.lastSparkleTime = 0;
 
     // 상수 정의
     const APPRENTICE_MAX_SPARKLES = 30;
@@ -768,7 +784,11 @@ class CanvasSparkleSystem {
     const instanceGroups = new Map();
 
     for (const sparkle of sparkles) {
-      if (sparkle.scaleCached <= 0 || sparkle.alphaCached <= 0) continue;
+      // 스케일과 알파 값을 실시간으로 계산
+      const scale = sparkle.getScale();
+      const alpha = sparkle.getAlpha();
+      
+      if (scale <= 0 || alpha <= 0) continue;
 
       const groupKey = `${Math.round(sparkle.size)}-${sparkle.color}`;
       if (!instanceGroups.has(groupKey)) {
@@ -1025,7 +1045,11 @@ class CanvasSparkleSystem {
   }
 
   startSparkleSystem() {
-    this.boundAnimate();
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+    }
+    this.isPaused = false;
+    this.animationFrameId = requestAnimationFrame(this.boundAnimate);
     console.log('고성능 Canvas 애니메이션 시작');
   }
 
@@ -1527,13 +1551,52 @@ document.addEventListener('visibilitychange', function() {
   }
 });
 
+// 디버깅을 위한 테스트 함수
+window.testTwinkleEffect = function() {
+  console.log('🧪 TwinkleTouch 테스트 시작');
+  console.log('현재 상태:', {
+    isActive: isActive,
+    wizardMode: wizardMode,
+    effectLevel: effectLevel,
+    sparkleSystem: !!sparkleSystem,
+    canvas: sparkleSystem ? !!sparkleSystem.canvas : false
+  });
+  
+  if (sparkleSystem) {
+    // 화면 중앙에 강제로 스파클 생성
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight / 2;
+    console.log(`중앙 위치에 스파클 생성: (${centerX}, ${centerY})`);
+    sparkleSystem.createClickBurst(centerX, centerY);
+  } else {
+    console.log('❌ SparkleSystem이 초기화되지 않았습니다.');
+    initializeTwinkleEffect();
+  }
+};
+
 // DOM 로드 후 실행
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', function() {
     loadSettings();
     setupStorageListener();
+    
+    // 3초 후 자동 테스트 (디버깅용)
+    setTimeout(() => {
+      console.log('🔄 자동 테스트 실행');
+      if (window.testTwinkleEffect) {
+        window.testTwinkleEffect();
+      }
+    }, 3000);
   });
 } else {
   loadSettings();
   setupStorageListener();
+  
+  // 3초 후 자동 테스트 (디버깅용)
+  setTimeout(() => {
+    console.log('🔄 자동 테스트 실행');
+    if (window.testTwinkleEffect) {
+      window.testTwinkleEffect();
+    }
+  }, 3000);
 }
