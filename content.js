@@ -322,7 +322,7 @@ class CanvasSparkleSystem {
         width: 100vw !important;
         height: 100vh !important;
         pointer-events: none !important;
-        z-index: 2147483647 !important;
+        z-index: 999999 !important;
         background: transparent !important;
         margin: 0 !important;
         padding: 0 !important;
@@ -440,7 +440,7 @@ class CanvasSparkleSystem {
     this.activeSparkles = [];
 
     // 대마법사 모드일 때 더 큰 풀 생성
-    const poolSize = effectLevel >= 1.0 ? this.ARCHMAGE_MAX_SPARKLES : this.MAX_SPARKLES;
+    const poolSize = effectLevel >= 1.0 ? 50 : this.MAX_SPARKLES;
 
     for (let i = 0; i < poolSize; i++) {
       this.sparklePool.push(new CanvasSparkle());
@@ -465,7 +465,7 @@ class CanvasSparkleSystem {
     if (!isActive || effectLevel === 0) return;
 
     // 동적 최대 파티클 수 체크
-    const maxSparkles = effectLevel >= 1.0 ? this.ARCHMAGE_MAX_SPARKLES : this.MAX_SPARKLES;
+    const maxSparkles = effectLevel >= 1.0 ? 50 : this.MAX_SPARKLES;
     if (this.activeSparkleCount >= maxSparkles) return;
 
     const hiddenSparkles = this.sparklePool.filter(sparkle => !sparkle.active);
@@ -813,10 +813,16 @@ class CanvasSparkleSystem {
   // 개별 스파클 렌더링 (소수 그룹용) - 강화된 글로우 효과
   drawIndividualSparkles(sparkles) {
     for (const sparkle of sparkles) {
+      // 실시간으로 스케일과 알파 값 계산
+      const scale = sparkle.getScale();
+      const alpha = sparkle.getAlpha();
+      
+      if (scale <= 0 || alpha <= 0) continue;
+
       this.ctx.save();
       this.ctx.translate(sparkle.currentX, sparkle.currentY);
-      this.ctx.scale(sparkle.scaleCached, sparkle.scaleCached);
-      this.ctx.globalAlpha = sparkle.alphaCached;
+      this.ctx.scale(scale, scale);
+      this.ctx.globalAlpha = alpha;
 
       const starPath = this.getStarPath(sparkle.size);
 
@@ -829,7 +835,8 @@ class CanvasSparkleSystem {
 
   // 다층 글로우 효과 렌더링 (마법사 등급별 강도 조절)
   drawMultiLayerGlow(starPath, sparkle) {
-    const baseGlowSize = sparkle.size * sparkle.scaleCached * 0.4;
+    const currentScale = sparkle.getScale();
+    const baseGlowSize = sparkle.size * currentScale * 0.4;
 
     // 마법사 등급별 글로우 강도 조절
     const glowMultiplier = effectLevel <= 0.33 ? 0.7 : 1.0; // 수련생: 70%, 대마법사: 100%
@@ -842,7 +849,8 @@ class CanvasSparkleSystem {
     this.ctx.shadowOffsetX = 0;
     this.ctx.shadowOffsetY = 0;
     this.ctx.fillStyle = sparkle.color;
-    this.ctx.globalAlpha = sparkle.alphaCached * 0.25 * effectLevel; // 등급별 조절
+    const currentAlpha = sparkle.getAlpha();
+    this.ctx.globalAlpha = currentAlpha * 0.25 * effectLevel; // 등급별 조절
     this.ctx.fill(starPath);
     this.ctx.restore();
 
@@ -853,7 +861,7 @@ class CanvasSparkleSystem {
     this.ctx.shadowOffsetX = 0;
     this.ctx.shadowOffsetY = 0;
     this.ctx.fillStyle = sparkle.color;
-    this.ctx.globalAlpha = sparkle.alphaCached * 0.5 * effectLevel;
+    this.ctx.globalAlpha = currentAlpha * 0.5 * effectLevel;
     this.ctx.fill(starPath);
     this.ctx.restore();
 
@@ -864,14 +872,14 @@ class CanvasSparkleSystem {
     this.ctx.shadowOffsetX = 0;
     this.ctx.shadowOffsetY = 0;
     this.ctx.fillStyle = sparkle.color;
-    this.ctx.globalAlpha = sparkle.alphaCached * 0.75 * effectLevel;
+    this.ctx.globalAlpha = currentAlpha * 0.75 * effectLevel;
     this.ctx.fill(starPath);
     this.ctx.restore();
 
     // 4. 핵심 별 (글로우 없이, 최대 밝기)
     this.ctx.save();
     this.ctx.fillStyle = sparkle.color;
-    this.ctx.globalAlpha = sparkle.alphaCached;
+    this.ctx.globalAlpha = currentAlpha;
     this.ctx.fill(starPath);
     this.ctx.restore();
   }
@@ -1027,6 +1035,95 @@ class CanvasSparkleSystem {
     e.preventDefault();
   }
 
+  // 뷰포트 컬링 (화면 밖 스파클 제거)
+  cullSparkles() {
+    if (!this.cullingEnabled) return this.activeSparkles;
+
+    const viewportMargin = 100; // 화면 밖 여유 공간
+    const visibleSparkles = [];
+
+    for (const sparkle of this.activeSparkles) {
+      if (sparkle.active &&
+          sparkle.currentX >= -viewportMargin &&
+          sparkle.currentX <= window.innerWidth + viewportMargin &&
+          sparkle.currentY >= -viewportMargin &&
+          sparkle.currentY <= window.innerHeight + viewportMargin) {
+        visibleSparkles.push(sparkle);
+      }
+    }
+
+    return visibleSparkles;
+  }
+
+  // 인스턴스 렌더링 (동일한 크기/색상 스파클들을 한 번에) - 강화된 글로우 효과
+  drawInstancedSparkles(sparkles, size, color) {
+    if (sparkles.length === 0) return;
+
+    // 배치 렌더링으로 성능 향상
+    this.ctx.save();
+    
+    for (const sparkle of sparkles) {
+      const scale = sparkle.getScale();
+      const alpha = sparkle.getAlpha();
+      
+      if (scale <= 0 || alpha <= 0) continue;
+
+      this.ctx.save();
+      this.ctx.translate(sparkle.currentX, sparkle.currentY);
+      this.ctx.scale(scale, scale);
+      this.ctx.globalAlpha = alpha;
+
+      const starPath = this.getStarPath(sparkle.size);
+      this.drawMultiLayerGlow(starPath, sparkle);
+
+      this.ctx.restore();
+    }
+    
+    this.ctx.restore();
+  }
+
+  // 적응형 렌더링 품질 조절
+  adaptiveQualityControl() {
+    const sparkleCount = this.activeSparkleCount;
+    
+    // 파티클 수에 따른 품질 조절
+    if (sparkleCount > 40) {
+      this.renderQuality = Math.max(0.6, this.renderQuality - 0.1);
+      this.isLowPowerMode = true;
+    } else if (sparkleCount < 20) {
+      this.renderQuality = Math.min(1.0, this.renderQuality + 0.05);
+      this.isLowPowerMode = false;
+    }
+  }
+
+  // WebGL 지원 확인
+  checkWebGLSupport() {
+    try {
+      const canvas = document.createElement('canvas');
+      return !!(canvas.getContext('webgl') || canvas.getContext('experimental-webgl'));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // 메모리 정리 시작
+  startMemoryCleanup() {
+    setInterval(() => {
+      // 캐시 크기 제한
+      if (this.starPathCache.size > 50) {
+        this.starPathCache.clear();
+      }
+      
+      if (this.geometryCache && this.geometryCache.size > 50) {
+        this.geometryCache.clear();
+      }
+      
+      if (this.transformCache && this.transformCache.size > 100) {
+        this.transformCache.clear();
+      }
+    }, this.memoryCleanupInterval);
+  }
+
   attachEventListeners() {
     document.addEventListener('mousemove', this.handleMouseMove, { passive: true });
     document.addEventListener('touchmove', this.handleTouchMove, { passive: true });
@@ -1051,6 +1148,95 @@ class CanvasSparkleSystem {
     this.isPaused = false;
     this.animationFrameId = requestAnimationFrame(this.boundAnimate);
     console.log('고성능 Canvas 애니메이션 시작');
+  }
+
+  // 뷰포트 컬링 (화면 밖 스파클 제거)
+  cullSparkles() {
+    if (!this.cullingEnabled) return this.activeSparkles;
+
+    const viewportMargin = 100; // 화면 밖 여유 공간
+    const visibleSparkles = [];
+
+    for (const sparkle of this.activeSparkles) {
+      if (sparkle.active &&
+          sparkle.currentX >= -viewportMargin &&
+          sparkle.currentX <= window.innerWidth + viewportMargin &&
+          sparkle.currentY >= -viewportMargin &&
+          sparkle.currentY <= window.innerHeight + viewportMargin) {
+        visibleSparkles.push(sparkle);
+      }
+    }
+
+    return visibleSparkles;
+  }
+
+  // 인스턴스 렌더링 (동일한 크기/색상 스파클들을 한 번에) - 강화된 글로우 효과
+  drawInstancedSparkles(sparkles, size, color) {
+    if (sparkles.length === 0) return;
+
+    // 배치 렌더링으로 성능 향상
+    this.ctx.save();
+    
+    for (const sparkle of sparkles) {
+      const scale = sparkle.getScale();
+      const alpha = sparkle.getAlpha();
+      
+      if (scale <= 0 || alpha <= 0) continue;
+
+      this.ctx.save();
+      this.ctx.translate(sparkle.currentX, sparkle.currentY);
+      this.ctx.scale(scale, scale);
+      this.ctx.globalAlpha = alpha;
+
+      const starPath = this.getStarPath(sparkle.size);
+      this.drawMultiLayerGlow(starPath, sparkle);
+
+      this.ctx.restore();
+    }
+    
+    this.ctx.restore();
+  }
+
+  // 적응형 렌더링 품질 조절
+  adaptiveQualityControl() {
+    const sparkleCount = this.activeSparkleCount;
+    
+    // 파티클 수에 따른 품질 조절
+    if (sparkleCount > 40) {
+      this.renderQuality = Math.max(0.6, this.renderQuality - 0.1);
+      this.isLowPowerMode = true;
+    } else if (sparkleCount < 20) {
+      this.renderQuality = Math.min(1.0, this.renderQuality + 0.05);
+      this.isLowPowerMode = false;
+    }
+  }
+
+  // WebGL 지원 확인
+  checkWebGLSupport() {
+    try {
+      const canvas = document.createElement('canvas');
+      return !!(canvas.getContext('webgl') || canvas.getContext('experimental-webgl'));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // 메모리 정리 시작
+  startMemoryCleanup() {
+    setInterval(() => {
+      // 캐시 크기 제한
+      if (this.starPathCache && this.starPathCache.size > 50) {
+        this.starPathCache.clear();
+      }
+      
+      if (this.geometryCache && this.geometryCache.size > 50) {
+        this.geometryCache.clear();
+      }
+      
+      if (this.transformCache && this.transformCache.size > 100) {
+        this.transformCache.clear();
+      }
+    }, this.memoryCleanupInterval);
   }
 
   pauseAnimations() {
@@ -1104,15 +1290,24 @@ class CanvasSparkleSystem {
     // 모든 리소스 정리
     this.sparklePool = [];
     this.activeSparkles = [];
-    this.starPathCache.clear();
+    
+    // 안전하게 Map 객체들 정리
+    if (this.starPathCache && typeof this.starPathCache.clear === 'function') {
+      this.starPathCache.clear();
+    }
+    if (this.shadowBatch && typeof this.shadowBatch.clear === 'function') {
+      this.shadowBatch.clear();
+    }
+    if (this.geometryCache && typeof this.geometryCache.clear === 'function') {
+      this.geometryCache.clear();
+    }
+    if (this.transformCache && typeof this.transformCache.clear === 'function') {
+      this.transformCache.clear();
+    }
+    
     this.renderBatch = [];
-    this.shadowBatch.clear();
     this.dirtyRegions = [];
     this.visibleSparkles = [];
-
-    // 새로운 캐시들 정리
-    this.geometryCache.clear();
-    this.transformCache.clear();
 
     // 타이머 정리
     if (this.mouseTimer) {
