@@ -661,7 +661,9 @@ class CanvasSparkleSystem {
   // 배치 렌더링 시스템 (극한 최적화)
   prepareBatchRender() {
     this.renderBatch.length = 0;
-    this.shadowBatch.clear();
+    if (this.shadowBatch && typeof this.shadowBatch.clear === 'function') {
+      this.shadowBatch.clear();
+    }
 
     // 활성 스파클들을 그림자 색상별로 그룹화
     for (const sparkle of this.activeSparkles) {
@@ -1030,6 +1032,495 @@ class CanvasSparkleSystem {
 
   handleTouchStart(e) {
     if (!isActive || e.touches.length === 0) return;
+
+    this.createClickBurst(e.touches[0].clientX, e.touches[0].clientY);
+    e.preventDefault();
+  }
+
+  pauseAnimations() {
+    console.log('⏸️ 애니메이션 일시정지 (메모리 최적화)');
+    
+    // 애니메이션 루프 중지
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+    
+    // 이벤트 리스너 일시 제거 (성능 최적화)
+    this.removeEventListeners();
+    
+    // 상태 저장
+    this.isPaused = true;
+  }
+  
+  resumeAnimations() {
+    if (!this.isPaused) return;
+    
+    console.log('▶️ 애니메이션 재시작');
+    
+    // 이벤트 리스너 다시 연결
+    this.attachEventListeners();
+    
+    // 애니메이션 루프 재시작
+    if (!this.animationFrameId && isActive) {
+      this.animationFrameId = requestAnimationFrame(this.boundAnimate);
+    }
+    
+    this.isPaused = false;
+  }
+
+  startSparkleSystem() {
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+    }
+    this.isPaused = false;
+    this.animationFrameId = requestAnimationFrame(this.boundAnimate);
+    console.log('고성능 Canvas 애니메이션 시작');
+  }
+
+  // 뷰포트 컬링 (화면 밖 스파클 제거)
+  cullSparkles() {
+    if (!this.cullingEnabled) return this.activeSparkles;
+
+    const viewportMargin = 100; // 화면 밖 여유 공간
+    const visibleSparkles = [];
+
+    for (const sparkle of this.activeSparkles) {
+      if (sparkle.active &&
+          sparkle.currentX >= -viewportMargin &&
+          sparkle.currentX <= window.innerWidth + viewportMargin &&
+          sparkle.currentY >= -viewportMargin &&
+          sparkle.currentY <= window.innerHeight + viewportMargin) {
+        visibleSparkles.push(sparkle);
+      }
+    }
+
+    return visibleSparkles;
+  }
+
+  // 인스턴스 렌더링 (동일한 크기/색상 스파클들을 한 번에) - 강화된 글로우 효과
+  drawInstancedSparkles(sparkles, size, color) {
+    if (sparkles.length === 0) return;
+
+    // 배치 렌더링으로 성능 향상
+    this.ctx.save();
+    
+    for (const sparkle of sparkles) {
+      const scale = sparkle.getScale();
+      const alpha = sparkle.getAlpha();
+      
+      if (scale <= 0 || alpha <= 0) continue;
+
+      this.ctx.save();
+      this.ctx.translate(sparkle.currentX, sparkle.currentY);
+      this.ctx.scale(scale, scale);
+      this.ctx.globalAlpha = alpha;
+
+      const starPath = this.getStarPath(sparkle.size);
+      this.drawMultiLayerGlow(starPath, sparkle);
+
+      this.ctx.restore();
+    }
+    
+    this.ctx.restore();
+  }
+
+  // 적응형 렌더링 품질 조절
+  adaptiveQualityControl() {
+    const sparkleCount = this.activeSparkleCount;
+    
+    // 파티클 수에 따른 품질 조절
+    if (sparkleCount > 40) {
+      this.renderQuality = Math.max(0.6, this.renderQuality - 0.1);
+      this.isLowPowerMode = true;
+    } else if (sparkleCount < 20) {
+      this.renderQuality = Math.min(1.0, this.renderQuality + 0.05);
+      this.isLowPowerMode = false;
+    }
+  }
+
+  // WebGL 지원 확인
+  checkWebGLSupport() {
+    try {
+      const canvas = document.createElement('canvas');
+      return !!(canvas.getContext('webgl') || canvas.getContext('experimental-webgl'));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // 메모리 정리 시작
+  startMemoryCleanup() {
+    setInterval(() => {
+      // 캐시 크기 제한
+      if (this.starPathCache && this.starPathCache.size > 50) {
+        this.starPathCache.clear();
+      }
+      
+      if (this.geometryCache && this.geometryCache.size > 50) {
+        this.geometryCache.clear();
+      }
+      
+      if (this.transformCache && this.transformCache.size > 100) {
+        this.transformCache.clear();
+      }
+    }, this.memoryCleanupInterval);
+  }
+
+  attachEventListeners() {
+    document.addEventListener('mousemove', this.boundHandleMouseMove, { passive: true });
+    document.addEventListener('touchmove', this.boundHandleTouchMove, { passive: true });
+    document.addEventListener('click', this.boundHandleClick, { passive: true });
+    document.addEventListener('touchstart', this.boundHandleTouchStart, { passive: true });
+    window.addEventListener('resize', this.boundHandleResize, { passive: true });
+    console.log('고성능 이벤트 리스너가 등록되었습니다');
+  }
+
+  removeEventListeners() {
+    document.removeEventListener('mousemove', this.boundHandleMouseMove);
+    document.removeEventListener('touchmove', this.boundHandleTouchMove);
+    document.removeEventListener('click', this.boundHandleClick);
+    document.removeEventListener('touchstart', this.boundHandleTouchStart);
+    window.removeEventListener('resize', this.boundHandleResize);
+    console.log('이벤트 리스너가 제거되었습니다');
+  }
+
+  destroy() {
+    console.log('🚀 극한 최적화 Canvas SparkleSystem 정리 중...');
+
+    isActive = false;
+
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+
+    this.removeEventListeners();
+
+    if (this.canvas && this.canvas.parentNode) {
+      this.canvas.parentNode.removeChild(this.canvas);
+    }
+
+    // 모든 리소스 정리
+    this.sparklePool = [];
+    this.activeSparkles = [];
+    
+    // 안전하게 Map 객체들 정리
+    if (this.starPathCache && typeof this.starPathCache.clear === 'function') {
+      this.starPathCache.clear();
+    }
+    if (this.shadowBatch && typeof this.shadowBatch.clear === 'function') {
+      this.shadowBatch.clear();
+    }
+    if (this.geometryCache && typeof this.geometryCache.clear === 'function') {
+      this.geometryCache.clear();
+    }
+    if (this.transformCache && typeof this.transformCache.clear === 'function') {
+      this.transformCache.clear();
+    }
+    
+    this.renderBatch = [];
+    this.dirtyRegions = [];
+    this.visibleSparkles = [];
+
+    // 타이머 정리
+    if (this.mouseTimer) {
+      clearTimeout(this.mouseTimer);
+      this.mouseTimer = null;
+    }
+
+    if (this.memoryCleanupInterval) {
+      clearInterval(this.memoryCleanupInterval);
+      this.memoryCleanupInterval = null;
+    }
+
+    if (this.performanceMonitorInterval) {
+      clearInterval(this.performanceMonitorInterval);
+      this.performanceMonitorInterval = null;
+    }
+
+    // 상태 초기화
+    this.activeSparkleCount = 0;
+    this.frameCount = 0;
+    this.isAnimating = false;
+
+    console.log('✅ Canvas SparkleSystem 정리 완료');
+  }
+}
+
+// Chrome API 사용 가능 확인
+function checkChromeAPI() {
+  return typeof chrome !== 'undefined' && 
+         chrome.storage && 
+         chrome.storage.sync && 
+         chrome.runtime;
+}
+
+// 메시지 리스너 설정
+function setupMessageListener() {
+  if (!checkChromeAPI()) return;
+
+  try {
+    chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+      console.log('메시지 수신:', request);
+
+      if (request.action === 'changeWizardMode') {
+        console.log('📨 마법사 모드 변경 요청:', request);
+
+        // 입력 검증 추가
+        if (!request.mode || !['muggle', 'apprentice', 'archmage'].includes(request.mode)) {
+          console.error('❌ 잘못된 마법사 모드:', request.mode);
+          sendResponse({ success: false, error: 'Invalid wizard mode' });
+          return;
+        }
+
+        if (typeof request.effectLevel !== 'number' || request.effectLevel < 0 || request.effectLevel > 1) {
+          console.error('❌ 잘못된 효과 레벨:', request.effectLevel);
+          sendResponse({ success: false, error: 'Invalid effect level' });
+          return;
+        }
+
+        // 마법사 등급 모드 변경
+        const oldWizardMode = wizardMode;
+        const oldIsActive = isActive;
+
+        wizardMode = request.mode;
+        effectLevel = request.effectLevel;
+        // 머글 모드가 아니면 항상 활성화
+        isActive = (wizardMode !== 'muggle');
+
+        console.log(`🔄 마법사 모드 변경: ${oldWizardMode}→${wizardMode}, 활성화: ${oldIsActive}→${isActive}, 효과: ${effectLevel}`);
+
+        if (isActive) {
+          initializeTwinkleEffect();
+        } else if (sparkleSystem) {
+          sparkleSystem.destroy();
+          sparkleSystem = null;
+        }
+
+        // 최종 상태 확인
+        setTimeout(() => {
+          console.log(`✅ 최종 상태 확인: isActive=${isActive}, wizardMode=${wizardMode}, sparkleSystem=${!!sparkleSystem}`);
+        }, 100);
+
+        sendResponse({success: true, mode: wizardMode, effectLevel: effectLevel});
+      } else if (request.action === 'toggleTwinkle') {
+        // 레거시 토글 메시지 지원 (하위 호환성)
+        isActive = request.enabled;
+        effectLevel = isActive ? 1.0 : 0;
+        wizardMode = isActive ? 'archmage' : 'muggle';
+
+        if (isActive) {
+          initializeTwinkleEffect();
+        } else if (sparkleSystem) {
+          sparkleSystem.destroy();
+          sparkleSystem = null;
+        }
+
+        sendResponse({success: true});
+      } else if (request.action === 'tabActivated') {
+        // 탭 활성화 시 애니메이션 재시작
+        if (sparkleSystem && isActive) {
+          sparkleSystem.startSparkleSystem();
+        }
+        sendResponse({ success: true });
+      } else if (request.action === 'syncSettings') {
+        // 설정 동기화
+        if (request.settings) {
+          const oldMode = wizardMode;
+          wizardMode = request.settings.wizardMode || 'archmage';
+          effectLevel = request.settings.effectLevel || 1.0;
+          isActive = request.settings.twinkleTouchEnabled !== false;
+          
+          if (oldMode !== wizardMode) {
+            initializeTwinkleEffect();
+          }
+        }
+        sendResponse({ success: true });
+      }
+    });
+  } catch (error) {
+    console.log('메시지 리스너 설정 오류:', error);
+  }
+}
+
+setupMessageListener();
+
+// 설정 로드
+function loadSettings() {
+  if (!checkChromeAPI()) {
+    isActive = true;
+    effectLevel = 1.0;
+    wizardMode = 'archmage';
+    initializeTwinkleEffect();
+    return;
+  }
+
+  try {
+    chrome.storage.sync.get(['wizardMode', 'effectLevel', 'twinkleTouchEnabled'], function(result) {
+      if (chrome.runtime.lastError) {
+        console.log('저장소 읽기 오류:', chrome.runtime.lastError);
+        isActive = true;
+        effectLevel = 1.0;
+        wizardMode = 'archmage';
+      } else {
+        wizardMode = result.wizardMode || 'archmage';
+        effectLevel = result.effectLevel !== undefined ? result.effectLevel : 1.0;
+        isActive = result.twinkleTouchEnabled !== false && wizardMode !== 'muggle';
+      }
+
+      console.log(`마법사 등급: ${wizardMode}, 효과 강도: ${effectLevel}, 활성화: ${isActive}`);
+
+      if (isActive) {
+        initializeTwinkleEffect();
+      }
+    });
+  } catch (error) {
+    console.log('저장소 접근 오류:', error);
+    isActive = true;
+    effectLevel = 1.0;
+    wizardMode = 'archmage';
+    initializeTwinkleEffect();
+  }
+}
+
+// 저장소 변경 감지
+function setupStorageListener() {
+  if (!checkChromeAPI()) return;
+
+  try {
+    chrome.storage.onChanged.addListener(function(changes, namespace) {
+      if (namespace === 'sync') {
+        let shouldReinitialize = false;
+
+        if (changes.wizardMode) {
+          wizardMode = changes.wizardMode.newValue;
+          shouldReinitialize = true;
+        }
+
+        if (changes.effectLevel) {
+          effectLevel = changes.effectLevel.newValue;
+          shouldReinitialize = true;
+        }
+
+        if (changes.twinkleTouchEnabled) {
+          const newEnabled = changes.twinkleTouchEnabled.newValue;
+          isActive = newEnabled && wizardMode !== 'muggle';
+          shouldReinitialize = true;
+        }
+
+        if (shouldReinitialize) {
+          console.log(`저장소 변경 감지: ${wizardMode}, 효과: ${effectLevel}, 활성화: ${isActive}`);
+          
+          if (isActive) {
+            initializeTwinkleEffect();
+          } else if (sparkleSystem) {
+            sparkleSystem.destroy();
+            sparkleSystem = null;
+          }
+        }
+      }
+    });
+  } catch (error) {
+    console.log('저장소 리스너 설정 오류:', error);
+  }
+}
+
+// 반짝이는 효과 초기화 함수
+function initializeTwinkleEffect() {
+  console.log('✨ TwinkleTouch 효과 초기화 중...');
+
+  try {
+    // 강제 활성화 (머글 모드가 아닌 경우)
+    if (wizardMode !== 'muggle') {
+      isActive = true;
+      console.log(`🔧 강제 활성화: wizardMode=${wizardMode}, isActive=${isActive}`);
+    } else {
+      isActive = false;
+      console.log(`🔧 비활성화: wizardMode=${wizardMode}, isActive=${isActive}`);
+    }
+
+    // 기존 시스템 정리
+    if (sparkleSystem) {
+      console.log('기존 시스템 정리 중...');
+      sparkleSystem.destroy();
+      sparkleSystem = null;
+    }
+
+    // 머글 모드면 시스템 생성하지 않음
+    if (wizardMode === 'muggle' || !isActive) {
+      console.log('머글 모드 또는 비활성화 상태 - 시스템 생성 안함');
+      return { success: true, message: '머글 모드로 설정됨' };
+    }
+
+    // 새로운 시스템 생성
+    console.log('새로운 CanvasSparkleSystem 생성 중...');
+    sparkleSystem = new CanvasSparkleSystem();
+    
+    console.log('CanvasSparkleSystem 초기화 중...');
+    sparkleSystem.init();
+
+    // 초기화 성공 확인
+    if (sparkleSystem && sparkleSystem.canvas) {
+      console.log(`✅ 초기화 성공: Canvas 크기=${sparkleSystem.canvas.width}x${sparkleSystem.canvas.height}`);
+      return { success: true, message: '초기화 성공' };
+    } else {
+      throw new Error('Canvas 생성 실패');
+    }
+
+  } catch (error) {
+    console.error('❌ TwinkleTouch 초기화 오류:', error);
+    
+    // 오류 발생 시 정리
+    if (sparkleSystem) {
+      sparkleSystem.destroy();
+      sparkleSystem = null;
+    }
+    
+    return { success: false, message: `초기화 오류: ${error.message}` };
+  }
+}
+
+// 페이지 가시성 변경 시 성능 최적화
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) {
+    // 페이지가 숨겨졌을 때 애니메이션 일시정지
+    if (sparkleSystem) {
+      sparkleSystem.pauseAnimations();
+    }
+  } else {
+    // 페이지가 다시 보일 때 애니메이션 재시작
+    if (sparkleSystem && isActive) {
+      sparkleSystem.resumeAnimations();
+    }
+  }
+});
+
+// 디버깅을 위한 테스트 함수
+window.testTwinkleEffect = function() {
+  console.log('🧪 TwinkleTouch 테스트 시작');
+  console.log('현재 상태:', {
+    isActive: isActive,
+    wizardMode: wizardMode,
+    effectLevel: effectLevel,
+    sparkleSystem: !!sparkleSystem,
+    canvas: sparkleSystem ? !!sparkleSystem.canvas : false
+  });
+  
+  if (sparkleSystem) {
+    // 화면 중앙에 강제로 스파클 생성
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight / 2;
+    console.log(`중앙 위치에 스파클 생성: (${centerX}, ${centerY})`);
+    sparkleSystem.createClickBurst(centerX, centerY);
+  } else {
+    console.log('❌ SparkleSystem이 초기화되지 않았습니다.');
+    initializeTwinkleEffect();
+  }
+};
+
+// DOM 로드 후 실행
+if (document.readyState === 'loading') {0) return;
 
     this.createClickBurst(e.touches[0].clientX, e.touches[0].clientY);
     e.preventDefault();
@@ -1745,6 +2236,29 @@ document.addEventListener('visibilitychange', function() {
     }
   }
 });
+
+// 디버깅을 위한 테스트 함수
+window.testTwinkleEffect = function() {
+  console.log('🧪 TwinkleTouch 테스트 시작');
+  console.log('현재 상태:', {
+    isActive: isActive,
+    wizardMode: wizardMode,
+    effectLevel: effectLevel,
+    sparkleSystem: !!sparkleSystem,
+    canvas: sparkleSystem ? !!sparkleSystem.canvas : false
+  });
+  
+  if (sparkleSystem) {
+    // 화면 중앙에 강제로 스파클 생성
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight / 2;
+    console.log(`중앙 위치에 스파클 생성: (${centerX}, ${centerY})`);
+    sparkleSystem.createClickBurst(centerX, centerY);
+  } else {
+    console.log('❌ SparkleSystem이 초기화되지 않았습니다.');
+    initializeTwinkleEffect();
+  }
+};
 
 // 디버깅을 위한 테스트 함수
 window.testTwinkleEffect = function() {
