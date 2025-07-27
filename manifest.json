@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TwinkleTouch - 화면 장식 효과",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "웹페이지에 아름다운 반짝이는 장식 효과를 추가하는 크롬 익스텐션",
   "permissions": [
     "activeTab",
@@ -20,4 +20,4 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   }
-} 
+}
