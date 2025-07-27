@@ -5,20 +5,13 @@ document.addEventListener('DOMContentLoaded', function() {
   const status = document.getElementById('status');
 
   // Wizard level settings
-  const wizardModes = {
+  const wizardConfig = {
     muggle: {
       name: 'Muggle',
       icon: '🧑‍💼',
       description: 'Arcane energies dormant',
       effectLevel: 0,
       statusClass: 'muggle'
-    },
-    apprentice: {
-      name: 'Apprentice',
-      icon: '🎓',
-      description: 'Minor cantrips manifesting',
-      effectLevel: 0.33,
-      statusClass: 'apprentice'
     },
     archmage: {
       name: 'Archmage',
@@ -70,7 +63,7 @@ document.addEventListener('DOMContentLoaded', function() {
       const selectedMode = this.dataset.mode;
       
       // 입력 검증 추가
-      if (!selectedMode || !['muggle', 'apprentice', 'archmage'].includes(selectedMode)) {
+      if (!selectedMode || !['muggle', 'archmage'].includes(selectedMode)) {
         console.error('Invalid wizard mode:', selectedMode);
         return;
       }
@@ -84,54 +77,51 @@ document.addEventListener('DOMContentLoaded', function() {
       // Update UI immediately
       updateUI(selectedMode);
       
-      // Save settings
+      // Save settings first, then send message
       try {
         chrome.storage.sync.set({ 
           wizardMode: selectedMode,
-          twinkleTouchEnabled: selectedMode !== 'muggle', // Enable if not muggle
-          effectLevel: wizardModes[selectedMode].effectLevel
+          twinkleTouchEnabled: selectedMode !== 'muggle',
+          effectLevel: wizardConfig[selectedMode].effectLevel
         }, function() {
           if (chrome.runtime.lastError) {
             console.log('Storage save error:', chrome.runtime.lastError);
-          } else {
-            console.log('Wizard level saved:', selectedMode);
-          }
-        });
-      } catch (error) {
-        console.log('Storage save error:', error);
-      }
-      
-      // Send message to current tab's content script
-      try {
-        chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
-          if (chrome.runtime.lastError) {
-            console.log('Tab query error:', chrome.runtime.lastError);
             return;
           }
           
-          if (tabs[0]) {
+          console.log('✅ Wizard level saved:', selectedMode);
+          
+          // Send message to content script after storage save
+          chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+            if (chrome.runtime.lastError || !tabs[0]) {
+              console.log('Tab query error:', chrome.runtime.lastError);
+              return;
+            }
+            
             chrome.tabs.sendMessage(tabs[0].id, {
               action: 'changeWizardMode',
               mode: selectedMode,
-              effectLevel: wizardModes[selectedMode].effectLevel,
+              effectLevel: wizardConfig[selectedMode].effectLevel,
               enabled: selectedMode !== 'muggle'
             }, function(response) {
               if (chrome.runtime.lastError) {
-                console.log('Content script not loaded yet:', chrome.runtime.lastError);
+                console.log('⚠️ Content script not loaded, relying on storage sync');
+              } else if (response && response.success) {
+                console.log('✅ Wizard mode change confirmed:', response);
               } else {
-                console.log('Wizard mode change message sent.');
+                console.log('❌ Wizard mode change failed:', response);
               }
             });
-          }
+          });
         });
       } catch (error) {
-        console.log('Message sending error:', error);
+        console.log('Storage save error:', error);
       }
     });
   });
 
   function updateUI(mode) {
-    const modeConfig = wizardModes[mode];
+    const modeConfig = wizardConfig[mode];
     if (!modeConfig) return;
 
     // Remove active class from all tabs and update ARIA attributes

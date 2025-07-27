@@ -1,106 +1,31 @@
-// TwinkleTouch Chrome Extension - Canvas-based Content Script (마법사 등급 시스템)
-console.log('TwinkleTouch Canvas 마법사 등급 버전이 로드되었습니다!');
+// TwinkleTouch Chrome Extension - SVG DOM-based Content Script (마법사 등급 시스템)
+console.log('TwinkleTouch SVG DOM 마법사 등급 버전이 로드되었습니다!');
 
 let isActive = true; // 기본값을 true로 설정
 let sparkleSystem = null;
-let effectLevel = 1.0; // 마법사 등급별 효과 강도 (0: 머글, 0.33: 수련생, 1.0: 대마법사)
+let effectLevel = 1.0; // 마법사 등급별 효과 강도 (0: 머글, 1.0: 대마법사)
 let wizardMode = 'archmage'; // 현재 마법사 등급
 
-// 고성능 Canvas 별 객체 (메모리 최적화)
-class CanvasSparkle {
+// 중복 처리 방지를 위한 전역 플래그
+let isHandlingModeChange = false;
+
+class SVGSparkleSystem {
   constructor() {
-    this.reset();
-  }
-
-  reset() {
-    this.active = false;
-    this.startX = 0;
-    this.startY = 0;
-    this.endX = 0;
-    this.endY = 0;
-    this.currentX = 0;
-    this.currentY = 0;
-    this.size = 0;
-    this.color = '#ffffff';
-    this.startTime = 0;
-    this.duration = 1500;
-    this.animationProgress = 0;
-  }
-
-  activate(startX, startY, endX, endY, size, color, duration) {
-    this.active = true;
-    this.startX = startX;
-    this.startY = startY;
-    this.endX = endX;
-    this.endY = endY;
-    this.currentX = startX;
-    this.currentY = startY;
-    this.size = size;
-    this.color = color;
-    this.duration = duration * 1000;
-    this.startTime = performance.now();
-    this.animationProgress = 0;
-  }
-
-  // 최적화된 이징 함수
-  getEasing(progress) {
-    // 간단한 ease-out 함수
-    return 1 - Math.pow(1 - progress, 3);
-  }
-
-  update() {
-    if (!this.active) return false;
-
-    const currentTime = performance.now();
-    const elapsed = currentTime - this.startTime;
-
-    if (elapsed >= this.duration) {
-      this.active = false;
-      return false;
-    }
-
-    this.animationProgress = elapsed / this.duration;
-    const easedProgress = this.getEasing(this.animationProgress);
-
-    // 위치 계산
-    this.currentX = this.startX + (this.endX - this.startX) * easedProgress;
-    this.currentY = this.startY + (this.endY - this.startY) * easedProgress;
-
-    return true;
-  }
-
-  getScale() {
-    const progress = this.animationProgress;
-    const scale = progress < 0.5 ? progress * 2 : 2 - (progress * 2);
-    return Math.max(0.1, scale); // 최소값 보장
-  }
-
-  getAlpha() {
-    const progress = this.animationProgress;
-    const alpha = progress < 0.8 ? 1 : (1 - progress) / 0.2;
-    return Math.max(0.1, alpha); // 최소값 보장
-  }
-}
-
-class CanvasSparkleSystem {
-  constructor() {
-    this.canvas = null;
-    this.ctx = null;
+    this.container = null;
     this.sparklePool = [];
-    this.activeSparkles = [];
     this.activeSparkleCount = 0;
-    this.maxSparkles = 30;
-    this.maxParticlesPerClick = 10;
-    this.animationFrameId = null;
+    this.maxSparkles = 100;
+    this.maxParticlesPerClick = 64;
+    this.normalMaxActive = 24;
     this.isPaused = false;
 
     // 색상 배열 정의
     this.colors = {
       white: '#ffffff',
-      yellow: '#ffff00',
-      cyan: '#00ffff',
-      magenta: '#ff00ff',
-      lime: '#00ff00'
+      yellow: '#ffff80',
+      cyan: '#80ffff',
+      magenta: '#ff80ff',
+      green: '#80ff80'
     };
     this.colorKeys = Object.keys(this.colors);
 
@@ -109,15 +34,12 @@ class CanvasSparkleSystem {
     this.pointerY = window.innerHeight / 2;
 
     // 스파클 생성 관련 상수
-    this.CLICK_BURST_COUNT = 60;
-    this.SPARKLE_THROTTLE = 16; // 16ms (60fps)
+    this.CLICK_BURST_COUNT = 64;
+    this.SPARKLE_THROTTLE = 50; // 50ms
     this.lastSparkleTime = 0;
 
-    // 캐시 객체들 (안전하게 초기화)
-    this.starPathCache = new Map();
-    this.shadowBatch = new Map();
-    this.geometryCache = new Map();
-    this.transformCache = new Map();
+    // SVG 4망성 별 캐시
+    this.starSVGCache = {};
 
     // 이벤트 리스너들
     this.boundHandleClick = this.handleClick.bind(this);
@@ -125,50 +47,68 @@ class CanvasSparkleSystem {
     this.boundHandleTouchStart = this.handleTouchStart.bind(this);
     this.boundHandleTouchMove = this.handleTouchMove.bind(this);
     this.boundHandleResize = this.handleResize.bind(this);
-    this.boundAnimate = this.animate.bind(this);
 
     // 현재 모드에 따른 최대 스파클 수 설정
     this.setModeBasedLimits();
 
-    console.log(`CanvasSparkleSystem 초기화 완료 - 모드: ${wizardMode}, 최대 스파클: ${this.maxSparkles}`);
+    console.log(`SVGSparkleSystem 초기화 완료 - 모드: ${wizardMode}, 최대 스파클: ${this.maxSparkles}`);
   }
 
   setModeBasedLimits() {
     switch(wizardMode) {
       case 'archmage':
-        this.maxSparkles = 50;
-        this.maxParticlesPerClick = 15;
-        break;
-      case 'apprentice':
-        this.maxSparkles = 30;
-        this.maxParticlesPerClick = 8;
+        this.maxSparkles = 100;
+        this.maxParticlesPerClick = 64;
+        this.normalMaxActive = 24;
         break;
       case 'muggle':
       default:
         this.maxSparkles = 0;
         this.maxParticlesPerClick = 0;
+        this.normalMaxActive = 0;
         break;
     }
   }
 
+  // SVG 4망성 별 문자열 생성 및 캐싱
+  getStarSVGString(size, color) {
+    const cacheKey = `${size}_${color}`;
+    
+    if (!this.starSVGCache[cacheKey]) {
+      this.starSVGCache[cacheKey] = `
+        <svg width="${size}" height="${size}" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+          <path fill="${color}" d="M18 36C18 26.0589 9.94112 18 0 18C9.94112 18 18 9.94112 18 0C18 9.94112 26.0589 18 36 18C26.0589 18 18 26.0589 18 36Z"></path>
+        </svg>
+      `;
+    }
+    
+    return this.starSVGCache[cacheKey];
+  }
+
+  // 랜덤 오프셋 생성
+  getRandomOffset(range) {
+    return (Math.random() * range * 2) - range;
+  }
+
+  // 랜덤 방향 생성 (각도)
+  getRandomDirection() {
+    return Math.random() * 360;
+  }
+
+  // 랜덤 거리 생성
+  getRandomDistance(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
   init() {
-    console.log('CanvasSparkleSystem.init() 시작');
+    console.log('SVGSparkleSystem.init() 시작');
 
     try {
-      // 기존 리소스 정리
-      this.destroy();
-
-      // 모드별 제한 설정
+      // 모드별 제한 설정 (destroy 제거)
       this.setModeBasedLimits();
 
-      // 머글 모드면 비활성화
-      if (wizardMode === 'muggle' || !isActive) {
-        console.log('머글 모드 또는 비활성화 상태 - 시스템 초기화 하지 않음');
-        return;
-      }
-
-      // Canvas 생성
-      this.createCanvas();
+      // 컨테이너 생성
+      this.createContainer();
 
       // 스파클 풀 생성
       this.createSparklePool();
@@ -176,30 +116,31 @@ class CanvasSparkleSystem {
       // 이벤트 리스너 등록
       this.attachEventListeners();
 
-      // 애니메이션 시작
+      // 시스템 시작
       this.startSparkleSystem();
 
-      console.log(`✅ CanvasSparkleSystem 초기화 완료`);
+      console.log(`✅ SVGSparkleSystem 초기화 완료`);
 
     } catch (error) {
-      console.error('❌ CanvasSparkleSystem 초기화 오류:', error);
+      console.error('❌ SVGSparkleSystem 초기화 오류:', error);
       throw error;
     }
   }
 
-  createCanvas() {
+  createContainer() {
     try {
-      // 기존 Canvas 제거
-      const existingCanvas = document.getElementById('twinkle-canvas');
-      if (existingCanvas) {
-        console.log('기존 Canvas 제거 중...');
-        existingCanvas.remove();
+      // 기존 컨테이너 제거
+      const existingContainer = document.getElementById('twinkle-sparkle-container');
+      if (existingContainer) {
+        console.log('기존 컨테이너 제거 중...');
+        existingContainer.remove();
       }
 
-      // 새 Canvas 생성
-      this.canvas = document.createElement('canvas');
-      this.canvas.id = 'twinkle-canvas';
-      this.canvas.style.cssText = `
+      // 새 컨테이너 생성
+      this.container = document.createElement('div');
+      this.container.id = 'twinkle-sparkle-container';
+      this.container.className = 'sparkle-container';
+      this.container.style.cssText = `
         position: fixed !important;
         top: 0 !important;
         left: 0 !important;
@@ -207,147 +148,135 @@ class CanvasSparkleSystem {
         height: 100vh !important;
         pointer-events: none !important;
         z-index: 999999 !important;
-        background: transparent !important;
+        overflow: hidden !important;
         margin: 0 !important;
         padding: 0 !important;
         border: none !important;
       `;
 
-      // Canvas 크기 설정
-      this.updateCanvasSize();
-
-      // DOM에 추가
-      if (!document.body) {
+      // DOM 추가 - 즉시 시도, 실패 시 DOMContentLoaded 대기
+      try {
+        if (document.body) {
+          document.body.appendChild(this.container);
+          console.log('✅ 컨테이너 DOM 추가 완료');
+        } else {
+          throw new Error('document.body not available');
+        }
+      } catch (domError) {
         console.log('document.body가 없음, DOM 로드 대기 중...');
-        document.addEventListener('DOMContentLoaded', () => {
-          document.body.appendChild(this.canvas);
-          console.log('DOMContentLoaded 후 Canvas 추가 완료');
-        });
-      } else {
-        document.body.appendChild(this.canvas);
-        console.log('Canvas DOM 추가 완료');
+        const addContainer = () => {
+          if (document.body) {
+            document.body.appendChild(this.container);
+            console.log('✅ DOMContentLoaded 후 컨테이너 추가 완료');
+          }
+        };
+        
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', addContainer, { once: true });
+        } else {
+          setTimeout(addContainer, 50);
+        }
       }
 
-      console.log('✅ Canvas 생성 완료:', this.canvas.width, 'x', this.canvas.height);
+      console.log('✅ 컨테이너 생성 완료');
       
     } catch (error) {
-      console.error('❌ Canvas 생성 오류:', error);
+      console.error('❌ 컨테이너 생성 오류:', error);
       throw error;
     }
   }
 
-  updateCanvasSize() {
-    const dpr = window.devicePixelRatio || 1;
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-
-    this.canvas.width = width * dpr;
-    this.canvas.height = height * dpr;
-    this.canvas.style.width = width + 'px';
-    this.canvas.style.height = height + 'px';
-
-    // Canvas 컨텍스트 설정
-    this.ctx = this.canvas.getContext('2d', {
-      alpha: true,
-      willReadFrequently: false,
-      desynchronized: true
-    });
-
-    this.ctx.scale(dpr, dpr);
-    this.ctx.imageSmoothingEnabled = true;
-    this.ctx.imageSmoothingQuality = 'high';
-
-    console.log(`🎨 Canvas 크기 설정: ${width}x${height}, DPR: ${dpr}`);
-  }
-
-  // 별 경로 생성 (캐싱)
-  getStarPath(size) {
-    const cacheKey = Math.round(size);
-
-    if (!this.starPathCache.has(cacheKey)) {
-      const path = new Path2D();
-      const centerX = 0;
-      const centerY = 0;
-      const outerRadius = cacheKey / 2;
-
-      // 별 모양 그리기
-      path.moveTo(centerX, centerY - outerRadius);
-      path.lineTo(centerX + outerRadius * 0.3, centerY - outerRadius * 0.3);
-      path.lineTo(centerX + outerRadius, centerY);
-      path.lineTo(centerX + outerRadius * 0.3, centerY + outerRadius * 0.3);
-      path.lineTo(centerX, centerY + outerRadius);
-      path.lineTo(centerX - outerRadius * 0.3, centerY + outerRadius * 0.3);
-      path.lineTo(centerX - outerRadius, centerY);
-      path.lineTo(centerX - outerRadius * 0.3, centerY - outerRadius * 0.3);
-      path.closePath();
-
-      this.starPathCache.set(cacheKey, path);
-
-      // 캐시 크기 제한
-      if (this.starPathCache.size > 50) {
-        const firstKey = this.starPathCache.keys().next().value;
-        this.starPathCache.delete(firstKey);
-      }
-    }
-
-    return this.starPathCache.get(cacheKey);
-  }
-
   createSparklePool() {
     this.sparklePool = [];
-    this.activeSparkles = [];
 
-    const poolSize = effectLevel >= 1.0 ? 50 : 30;
+    const poolSize = effectLevel >= 1.0 ? this.maxSparkles : Math.floor(this.maxSparkles * 0.6);
 
     for (let i = 0; i < poolSize; i++) {
-      this.sparklePool.push(new CanvasSparkle());
+      const sparkleDiv = document.createElement('div');
+      sparkleDiv.className = 'sparkle';
+      sparkleDiv.style.cssText = `
+        position: absolute;
+        transform: translate(-50%, -50%);
+        will-change: transform, left, top;
+        transition: all 1.5s cubic-bezier(0, 0, 0.58, 1);
+        backface-visibility: hidden;
+        perspective: 1000px;
+        transform-style: preserve-3d;
+        display: none;
+      `;
+      
+      if (this.container) {
+        this.container.appendChild(sparkleDiv);
+      }
+      this.sparklePool.push(sparkleDiv);
     }
 
     console.log(`🏊‍♂️ 스파클 풀 생성: ${poolSize}개 (등급: ${wizardMode})`);
   }
 
-  getRandomOffset(range) {
-    return (Math.random() * range * 2) - range;
-  }
-
-  getRandomDirection() {
-    return Math.random() * 360;
-  }
-
-  getRandomDistance(min, max) {
-    return min + Math.random() * (max - min);
-  }
-
   activateSparkleAt(startX, startY, minDistance, maxDistance) {
     if (!isActive || effectLevel === 0) return;
 
-    const maxSparkles = effectLevel >= 1.0 ? 50 : 30;
-    if (this.activeSparkleCount >= maxSparkles) return;
+    // 일반 모드에서는 제한된 수의 별만 허용
+    const isNormalMode = !this.isClickBurstMode;
+    const maxAllowed = isNormalMode ? this.normalMaxActive : this.maxSparkles;
+    
+    if (this.activeSparkleCount >= maxAllowed) return;
 
-    const hiddenSparkles = this.sparklePool.filter(sparkle => !sparkle.active);
+    const hiddenSparkles = this.sparklePool.filter(sparkle => sparkle.style.display === 'none');
     if (hiddenSparkles.length === 0) return;
 
-    const sparkle = hiddenSparkles[Math.floor(Math.random() * hiddenSparkles.length)];
+    this.activeSparkleCount++;
+
+    const sparkleDiv = hiddenSparkles[Math.floor(Math.random() * hiddenSparkles.length)];
 
     // 색상 선택
     const colorName = this.colorKeys[Math.floor(Math.random() * this.colorKeys.length)];
     const color = this.colors[colorName];
 
     // 마법사 등급별 크기 조절
-    const baseSize = 16 + Math.random() * 16;
+    const baseSize = 12 + Math.random() * 36;
     const sizeMultiplier = effectLevel <= 0.33 ? 0.6 + effectLevel * 0.6 : effectLevel;
-    const size = baseSize * sizeMultiplier;
+    const size = Math.floor(baseSize * sizeMultiplier);
 
     // 마법사 등급별 지속시간 조절
     const baseDuration = 1.2 + Math.random() * 0.6;
     const durationMultiplier = effectLevel <= 0.33 ? 0.7 + effectLevel * 0.6 : effectLevel;
     const animDuration = baseDuration * durationMultiplier;
 
+    // SVG 설정
+    sparkleDiv.innerHTML = this.getStarSVGString(size, color);
+
+    const starSVG = sparkleDiv.querySelector('svg');
+    if (starSVG) {
+      // 블러 효과 및 애니메이션 설정
+      const blurSize = size * 0.33;
+      starSVG.style.cssText = `
+        filter: drop-shadow(0 0 ${blurSize}px ${color});
+        animation: continuousScale ${animDuration}s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+        will-change: transform;
+      `;
+
+      // CSS 애니메이션 추가 (한 번만)
+      if (!document.getElementById('sparkle-animations')) {
+        const style = document.createElement('style');
+        style.id = 'sparkle-animations';
+        style.textContent = `
+          @keyframes continuousScale {
+            0% { transform: scale(0) translateZ(0); }
+            40% { transform: scale(0.8) translateZ(0); }
+            60% { transform: scale(0.9) translateZ(0); }
+            100% { transform: scale(0) translateZ(0); }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
+
     const startOffsetX = this.getRandomOffset(4);
     const startOffsetY = this.getRandomOffset(4);
     const angle = this.getRandomDirection();
 
-    // 마법사 등급별 거리 조절
     const distanceMultiplier = effectLevel <= 0.33 ? effectLevel * 1.8 : 1.0 + effectLevel * 1.0;
     const adjustedMinDistance = minDistance * distanceMultiplier;
     const adjustedMaxDistance = maxDistance * distanceMultiplier;
@@ -356,18 +285,24 @@ class CanvasSparkleSystem {
     const endX = startX + startOffsetX + Math.cos(angle * Math.PI / 180) * distance;
     const endY = startY + startOffsetY + Math.sin(angle * Math.PI / 180) * distance;
 
-    sparkle.activate(
-      startX + startOffsetX,
-      startY + startOffsetY,
-      endX,
-      endY,
-      size,
-      color,
-      animDuration
-    );
+    // 시작 위치 설정
+    requestAnimationFrame(() => {
+      sparkleDiv.style.left = `${startX + startOffsetX}px`;
+      sparkleDiv.style.top = `${startY + startOffsetY}px`;
+      sparkleDiv.style.display = 'block';
 
-    this.activeSparkleCount++;
-    this.activeSparkles.push(sparkle);
+      // 다음 프레임에서 이동 시작
+      requestAnimationFrame(() => {
+        sparkleDiv.style.left = `${endX}px`;
+        sparkleDiv.style.top = `${endY}px`;
+      });
+    });
+
+    // 애니메이션 완료 후 제거
+    setTimeout(() => {
+      sparkleDiv.style.display = 'none';
+      this.activeSparkleCount--;
+    }, animDuration * 1000);
   }
 
   createClickBurst(x, y) {
@@ -383,6 +318,8 @@ class CanvasSparkleSystem {
     if (adjustedBurstCount === 0) return;
 
     console.log(`💥 Click Burst: ${adjustedBurstCount} particles at (${x}, ${y})`);
+
+    this.isClickBurstMode = true;
 
     const batchSize = 16;
     const batches = Math.ceil(adjustedBurstCount / batchSize);
@@ -409,111 +346,14 @@ class CanvasSparkleSystem {
         }
       }, batch * 50);
     }
-  }
 
-  // 다층 글로우 효과 렌더링
-  drawMultiLayerGlow(starPath, sparkle) {
-    const currentScale = sparkle.getScale();
-    const currentAlpha = sparkle.getAlpha();
-    const baseGlowSize = sparkle.size * currentScale * 0.4;
-    const glowMultiplier = effectLevel <= 0.33 ? 0.7 : 1.0;
-    const glowSize = baseGlowSize * glowMultiplier;
-
-    // 1. 외부 글로우
-    this.ctx.save();
-    this.ctx.shadowColor = sparkle.color;
-    this.ctx.shadowBlur = glowSize * 1.8;
-    this.ctx.shadowOffsetX = 0;
-    this.ctx.shadowOffsetY = 0;
-    this.ctx.fillStyle = sparkle.color;
-    this.ctx.globalAlpha = currentAlpha * 0.25 * effectLevel;
-    this.ctx.fill(starPath);
-    this.ctx.restore();
-
-    // 2. 중간 글로우
-    this.ctx.save();
-    this.ctx.shadowColor = sparkle.color;
-    this.ctx.shadowBlur = glowSize * 1.2;
-    this.ctx.shadowOffsetX = 0;
-    this.ctx.shadowOffsetY = 0;
-    this.ctx.fillStyle = sparkle.color;
-    this.ctx.globalAlpha = currentAlpha * 0.5 * effectLevel;
-    this.ctx.fill(starPath);
-    this.ctx.restore();
-
-    // 3. 내부 글로우
-    this.ctx.save();
-    this.ctx.shadowColor = sparkle.color;
-    this.ctx.shadowBlur = glowSize * 0.6;
-    this.ctx.shadowOffsetX = 0;
-    this.ctx.shadowOffsetY = 0;
-    this.ctx.fillStyle = sparkle.color;
-    this.ctx.globalAlpha = currentAlpha * 0.75 * effectLevel;
-    this.ctx.fill(starPath);
-    this.ctx.restore();
-
-    // 4. 핵심 별
-    this.ctx.save();
-    this.ctx.fillStyle = sparkle.color;
-    this.ctx.globalAlpha = currentAlpha;
-    this.ctx.fill(starPath);
-    this.ctx.restore();
-  }
-
-  animate() {
-    if (!isActive || this.isPaused) {
-      this.animationFrameId = requestAnimationFrame(this.boundAnimate);
-      return;
-    }
-
-    // 스파클 업데이트 및 정리
-    let hasUpdates = false;
-    for (let i = this.activeSparkles.length - 1; i >= 0; i--) {
-      const sparkle = this.activeSparkles[i];
-
-      if (sparkle.active) {
-        const updated = sparkle.update();
-        hasUpdates = hasUpdates || updated;
-
-        if (!sparkle.active) {
-          this.activeSparkles.splice(i, 1);
-          this.activeSparkleCount--;
-        }
-      } else {
-        this.activeSparkles.splice(i, 1);
-        this.activeSparkleCount--;
-      }
-    }
-
-    // 렌더링
-    if (hasUpdates || this.activeSparkles.length > 0) {
-      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-      for (const sparkle of this.activeSparkles) {
-        if (!sparkle.active) continue;
-
-        const scale = sparkle.getScale();
-        const alpha = sparkle.getAlpha();
-        
-        if (scale <= 0 || alpha <= 0) continue;
-
-        this.ctx.save();
-        this.ctx.translate(sparkle.currentX, sparkle.currentY);
-        this.ctx.scale(scale, scale);
-        this.ctx.globalAlpha = alpha;
-
-        const starPath = this.getStarPath(sparkle.size);
-        this.drawMultiLayerGlow(starPath, sparkle);
-
-        this.ctx.restore();
-      }
-    }
-
-    this.animationFrameId = requestAnimationFrame(this.boundAnimate);
+    // 클릭 버스트 모드 해제
+    setTimeout(() => {
+      this.isClickBurstMode = false;
+    }, batches * 50 + 500);
   }
 
   handleResize() {
-    this.updateCanvasSize();
     this.pointerX = window.innerWidth / 2;
     this.pointerY = window.innerHeight / 2;
   }
@@ -529,11 +369,19 @@ class CanvasSparkleSystem {
 
     this.lastSparkleTime = now;
 
-    // 마법사 등급별 기본 스파클 생성 확률 조정
-    let basicSpawnChance = effectLevel <= 0.33 ? 0.75 : 0.2;
+    let basicSpawnChance = effectLevel <= 0.33 ? 0.6 : 0.4;
 
     if (Math.random() > basicSpawnChance) {
       this.activateSparkleAt(this.pointerX, this.pointerY, 70, 140);
+    }
+
+    if (Math.random() > 0.9) {
+      const extraCount = 1 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < extraCount; i++) {
+        setTimeout(() => {
+          this.activateSparkleAt(this.pointerX, this.pointerY, 70, 140);
+        }, i * 20);
+      }
     }
   }
 
@@ -548,7 +396,7 @@ class CanvasSparkleSystem {
 
     this.lastSparkleTime = now;
 
-    let basicSpawnChance = effectLevel <= 0.33 ? 0.75 : 0.2;
+    let basicSpawnChance = effectLevel <= 0.33 ? 0.6 : 0.4;
 
     if (Math.random() > basicSpawnChance) {
       this.activateSparkleAt(this.pointerX, this.pointerY, 70, 140);
@@ -582,12 +430,6 @@ class CanvasSparkleSystem {
 
   pauseAnimations() {
     console.log('⏸️ 애니메이션 일시정지');
-    
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-      this.animationFrameId = null;
-    }
-    
     this.removeEventListeners();
     this.isPaused = true;
   }
@@ -596,22 +438,33 @@ class CanvasSparkleSystem {
     if (!this.isPaused) return;
     
     console.log('▶️ 애니메이션 재시작');
-    
     this.attachEventListeners();
-    
-    if (!this.animationFrameId && isActive) {
-      this.animationFrameId = requestAnimationFrame(this.boundAnimate);
-    }
-    
     this.isPaused = false;
   }
 
   startSparkleSystem() {
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-    }
     this.isPaused = false;
-    this.animationFrameId = requestAnimationFrame(this.boundAnimate);
+    
+    // 자동 별 생성 시스템
+    const autoCreateSparkles = (timestamp) => {
+      if (this.isPaused || !isActive) {
+        requestAnimationFrame(autoCreateSparkles);
+        return;
+      }
+
+      if (timestamp - this.lastSparkleTime > 100 + Math.random() * 200) {
+        const burstCount = 1 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < burstCount; i++) {
+          setTimeout(() => {
+            this.activateSparkleAt(this.pointerX, this.pointerY, 70, 140);
+          }, i * 20);
+        }
+        this.lastSparkleTime = timestamp;
+      }
+      requestAnimationFrame(autoCreateSparkles);
+    };
+    
+    requestAnimationFrame(autoCreateSparkles);
     console.log('✨ 스파클 시스템 시작');
   }
 
@@ -634,43 +487,29 @@ class CanvasSparkleSystem {
   }
 
   destroy() {
-    console.log('🚀 Canvas SparkleSystem 정리 중...');
+    console.log('🚀 SVG SparkleSystem 정리 중...');
 
     isActive = false;
 
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-      this.animationFrameId = null;
-    }
-
     this.removeEventListeners();
 
-    if (this.canvas && this.canvas.parentNode) {
-      this.canvas.parentNode.removeChild(this.canvas);
+    if (this.container && this.container.parentNode) {
+      this.container.parentNode.removeChild(this.container);
     }
 
-    // 모든 리소스 정리 (안전하게)
+    // 애니메이션 스타일 제거
+    const animationStyle = document.getElementById('sparkle-animations');
+    if (animationStyle) {
+      animationStyle.remove();
+    }
+
+    // 모든 리소스 정리
     this.sparklePool = [];
-    this.activeSparkles = [];
-    
-    if (this.starPathCache && typeof this.starPathCache.clear === 'function') {
-      this.starPathCache.clear();
-    }
-    if (this.shadowBatch && typeof this.shadowBatch.clear === 'function') {
-      this.shadowBatch.clear();
-    }
-    if (this.geometryCache && typeof this.geometryCache.clear === 'function') {
-      this.geometryCache.clear();
-    }
-    if (this.transformCache && typeof this.transformCache.clear === 'function') {
-      this.transformCache.clear();
-    }
-
-    // 상태 초기화
+    this.starSVGCache = {};
     this.activeSparkleCount = 0;
     this.isPaused = false;
 
-    console.log('✅ Canvas SparkleSystem 정리 완료');
+    console.log('✅ SVG SparkleSystem 정리 완료');
   }
 }
 
@@ -693,8 +532,15 @@ function setupMessageListener() {
       if (request.action === 'changeWizardMode') {
         console.log('📨 마법사 모드 변경 요청:', request);
 
+        // 중복 처리 방지
+        if (isHandlingModeChange) {
+          console.log('⚠️ 모드 변경 중 - 중복 요청 무시');
+          sendResponse({ success: false, error: 'Mode change in progress' });
+          return;
+        }
+
         // 입력 검증
-        if (!request.mode || !['muggle', 'apprentice', 'archmage'].includes(request.mode)) {
+        if (!request.mode || !['muggle', 'archmage'].includes(request.mode)) {
           console.error('❌ 잘못된 마법사 모드:', request.mode);
           sendResponse({ success: false, error: 'Invalid wizard mode' });
           return;
@@ -706,24 +552,56 @@ function setupMessageListener() {
           return;
         }
 
+        isHandlingModeChange = true;
+
         // 마법사 등급 모드 변경
         const oldWizardMode = wizardMode;
         const oldIsActive = isActive;
+        const oldEffectLevel = effectLevel;
 
-        wizardMode = request.mode;
-        effectLevel = request.effectLevel;
-        isActive = (wizardMode !== 'muggle');
+        const newWizardMode = request.mode;
+        const newEffectLevel = request.effectLevel;
+        const newIsActive = (newWizardMode !== 'muggle');
 
-        console.log(`🔄 마법사 모드 변경: ${oldWizardMode}→${wizardMode}, 활성화: ${oldIsActive}→${isActive}, 효과: ${effectLevel}`);
+        console.log(`🔄 마법사 모드 변경: ${oldWizardMode}→${newWizardMode}, 활성화: ${oldIsActive}→${newIsActive}, 효과: ${oldEffectLevel}→${newEffectLevel}`);
 
-        if (isActive) {
-          initializeTwinkleEffect();
-        } else if (sparkleSystem) {
-          sparkleSystem.destroy();
-          sparkleSystem = null;
+        // 실제 변경사항이 있는지 확인
+        if (newWizardMode === wizardMode && 
+            newEffectLevel === effectLevel && 
+            newIsActive === isActive) {
+          console.log('⚪ 동일한 상태 - 변경사항 없음');
+          sendResponse({success: true, mode: wizardMode, effectLevel: effectLevel});
+          isHandlingModeChange = false;
+          return;
         }
 
-        sendResponse({success: true, mode: wizardMode, effectLevel: effectLevel});
+        // 상태 업데이트
+        wizardMode = newWizardMode;
+        effectLevel = newEffectLevel;
+        isActive = newIsActive;
+
+        // 시스템 재초기화
+        try {
+          if (sparkleSystem) {
+            sparkleSystem.destroy();
+            sparkleSystem = null;
+          }
+
+          if (isActive) {
+            initializeTwinkleEffect();
+          }
+
+          sendResponse({success: true, mode: wizardMode, effectLevel: effectLevel});
+        } catch (error) {
+          console.error('❌ 모드 변경 중 오류:', error);
+          sendResponse({ success: false, error: error.message });
+        } finally {
+          // 플래그 해제 (500ms 후)
+          setTimeout(() => {
+            isHandlingModeChange = false;
+          }, 500);
+        }
+
       } else if (request.action === 'tabActivated') {
         if (sparkleSystem && isActive) {
           sparkleSystem.startSparkleSystem();
@@ -793,33 +671,61 @@ function setupStorageListener() {
   try {
     chrome.storage.onChanged.addListener(function(changes, namespace) {
       if (namespace === 'sync') {
+        // 메시지 처리 중인지 확인 (전역 변수 접근)
+        if (isHandlingModeChange) {
+          console.log('⚠️ 메시지 처리 중 - 저장소 변경 무시');
+          return;
+        }
+
         let shouldReinitialize = false;
+        let newWizardMode = wizardMode;
+        let newEffectLevel = effectLevel;
+        let newIsActive = isActive;
 
         if (changes.wizardMode) {
-          wizardMode = changes.wizardMode.newValue;
+          newWizardMode = changes.wizardMode.newValue;
           shouldReinitialize = true;
         }
 
         if (changes.effectLevel) {
-          effectLevel = changes.effectLevel.newValue;
+          newEffectLevel = changes.effectLevel.newValue;
           shouldReinitialize = true;
         }
 
         if (changes.twinkleTouchEnabled) {
           const newEnabled = changes.twinkleTouchEnabled.newValue;
-          isActive = newEnabled && wizardMode !== 'muggle';
+          newIsActive = newEnabled && newWizardMode !== 'muggle';
           shouldReinitialize = true;
         }
 
-        if (shouldReinitialize) {
-          console.log(`저장소 변경 감지: ${wizardMode}, 효과: ${effectLevel}, 활성화: ${isActive}`);
+        // 실제 변경사항이 있는지 확인
+        if (shouldReinitialize && 
+            (newWizardMode !== wizardMode || 
+             newEffectLevel !== effectLevel || 
+             newIsActive !== isActive)) {
           
-          if (isActive) {
-            initializeTwinkleEffect();
-          } else if (sparkleSystem) {
-            sparkleSystem.destroy();
-            sparkleSystem = null;
+          console.log(`📦 저장소 변경 감지: ${wizardMode}→${newWizardMode}, 효과: ${effectLevel}→${newEffectLevel}, 활성화: ${isActive}→${newIsActive}`);
+          
+          // 상태 업데이트
+          wizardMode = newWizardMode;
+          effectLevel = newEffectLevel;
+          isActive = newIsActive;
+          
+          // 시스템 재초기화
+          try {
+            if (sparkleSystem) {
+              sparkleSystem.destroy();
+              sparkleSystem = null;
+            }
+
+            if (isActive) {
+              initializeTwinkleEffect();
+            }
+          } catch (error) {
+            console.error('❌ 저장소 변경 처리 중 오류:', error);
           }
+        } else if (shouldReinitialize) {
+          console.log('⚪ 저장소 변경 감지 - 동일한 상태, 변경사항 없음');
         }
       }
     });
@@ -856,19 +762,20 @@ function initializeTwinkleEffect() {
     }
 
     // 새로운 시스템 생성
-    console.log('새로운 CanvasSparkleSystem 생성 중...');
-    sparkleSystem = new CanvasSparkleSystem();
+    console.log('새로운 SVGSparkleSystem 생성 중...');
+    sparkleSystem = new SVGSparkleSystem();
     
-    console.log('CanvasSparkleSystem 초기화 중...');
+    console.log('SVGSparkleSystem 초기화 중...');
     sparkleSystem.init();
 
-    // 초기화 성공 확인
-    if (sparkleSystem && sparkleSystem.canvas) {
-      console.log(`✅ 초기화 성공: Canvas 크기=${sparkleSystem.canvas.width}x${sparkleSystem.canvas.height}`);
-      return { success: true, message: '초기화 성공' };
-    } else {
-      throw new Error('Canvas 생성 실패');
-    }
+    // 초기화 성공 확인 (DOM 생성 완료 대기)
+    setTimeout(() => {
+      if (sparkleSystem && sparkleSystem.container && sparkleSystem.container.parentNode) {
+        console.log(`✅ 초기화 성공: 컨테이너가 DOM에 추가됨`);
+      }
+    }, 100);
+
+    return { success: true, message: '초기화 성공' };
 
   } catch (error) {
     console.error('❌ TwinkleTouch 초기화 오류:', error);
@@ -904,7 +811,7 @@ window.testTwinkleEffect = function() {
     wizardMode: wizardMode,
     effectLevel: effectLevel,
     sparkleSystem: !!sparkleSystem,
-    canvas: sparkleSystem ? !!sparkleSystem.canvas : false
+    container: sparkleSystem ? !!sparkleSystem.container : false
   });
   
   if (sparkleSystem) {

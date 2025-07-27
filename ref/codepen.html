@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Safari Compatible SVG Star Effect</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #0f1429;
+      background-image: linear-gradient(rgba(20, 30, 60, 0.7) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(20, 30, 60, 0.7) 1px, transparent 1px);
+      background-size: 40px 40px;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .sparkle-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    
+    .sparkle {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      will-change: transform, left, top;
+      transition: all 1.5s cubic-bezier(0, 0, 0.58, 1);
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
+      -webkit-perspective: 1000;
+      perspective: 1000;
+      -webkit-transform-style: preserve-3d;
+      transform-style: preserve-3d;
+    }
+    
+    /* Safari 호환성을 위해 웹킷 접두사 추가 및 transform 속성만 분리 */
+    @keyframes continuousScale {
+      0% { 
+        -webkit-transform: scale(0) translateZ(0);
+        transform: scale(0) translateZ(0); 
+      }
+      40% { 
+        -webkit-transform: scale(0.8) translateZ(0);
+        transform: scale(0.8) translateZ(0); 
+      }
+      60% { 
+        -webkit-transform: scale(0.9) translateZ(0);
+        transform: scale(0.9) translateZ(0); 
+      }
+      100% { 
+        -webkit-transform: scale(0) translateZ(0);
+        transform: scale(0) translateZ(0); 
+      }
+    }
+    
+    /* Safari용 별도 애니메이션 규칙 */
+    @-webkit-keyframes continuousScale {
+      0% { 
+        -webkit-transform: scale(0) translateZ(0);
+        transform: scale(0) translateZ(0); 
+      }
+      40% { 
+        -webkit-transform: scale(0.8) translateZ(0);
+        transform: scale(0.8) translateZ(0); 
+      }
+      60% { 
+        -webkit-transform: scale(0.9) translateZ(0);
+        transform: scale(0.9) translateZ(0); 
+      }
+      100% { 
+        -webkit-transform: scale(0) translateZ(0);
+        transform: scale(0) translateZ(0); 
+      }
+    }
+    
+    .sparkle svg {
+      -webkit-filter: drop-shadow(0 0 var(--blur-size, 10px) var(--color, white));
+      filter: drop-shadow(0 0 var(--blur-size, 10px) var(--color, white));
+      -webkit-animation: continuousScale var(--duration, 1.5s) cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+      animation: continuousScale var(--duration, 1.5s) cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+      -webkit-will-change: transform;
+      will-change: transform;
+    }
+  </style>
+</head>
+<body>
+  <div class="sparkle-container" id="sparkleContainer"></div>
+
+  <script>
+    const container = document.getElementById('sparkleContainer');
+    const colors = {
+      white: '#ffffff',
+      yellow: '#ffff80',
+      cyan: '#80ffff',
+      magenta: '#ff80ff',
+      green: '#80ff80'
+    };
+    const MAX_SPARKLES = 100; // 일반 풀 크기 증가 (클릭 이벤트를 위해)
+    const NORMAL_MAX_ACTIVE = 24; // 일반 상태의 최대 활성 별 수
+    const CLICK_BURST_COUNT = 64; // 클릭 시 발생하는 별 개수
+    
+    // 별 SVG 문자열 캐싱 (색상별로)
+    const starSVGCache = {};
+    
+    // 사파리 감지 (일부 Safari 특정 처리를 위해)
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    
+    // SVG 문자열 생성 및 캐싱
+    function getStarSVGString(size, color) {
+      const cacheKey = `${size}_${color}`;
+      
+      if (!starSVGCache[cacheKey]) {
+        starSVGCache[cacheKey] = `
+          <svg width="${size}" height="${size}" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+            <path fill="${color}" d="M18 36C18 26.0589 9.94112 18 0 18C9.94112 18 18 9.94112 18 0C18 9.94112 26.0589 18 36 18C26.0589 18 18 26.0589 18 36Z"></path>
+          </svg>
+        `;
+      }
+      
+      return starSVGCache[cacheKey];
+    }
+    
+    // 터치 이벤트와 마우스 이벤트 모두 처리하는 변수
+    let pointerX = window.innerWidth / 2;
+    let pointerY = window.innerHeight / 2;
+    
+    // 마우스 움직임 추적 - 디바운싱 적용
+    let mouseTimer;
+    document.addEventListener('mousemove', (e) => {
+      if (!mouseTimer) {
+        mouseTimer = setTimeout(() => {
+          pointerX = e.clientX;
+          pointerY = e.clientY;
+          mouseTimer = null;
+        }, 5); // 5ms 디바운싱
+      }
+    });
+    
+    // 터치 움직임 추적 (모바일용)
+    document.addEventListener('touchmove', (e) => {
+      if (e.touches.length > 0) {
+        pointerX = e.touches[0].clientX;
+        pointerY = e.touches[0].clientY;
+      }
+    });
+    
+    // 특정 위치 근처의 랜덤 위치 생성 (범위 내)
+    function getRandomOffset(range) {
+      return (Math.random() * range * 2) - range; // -range에서 range px 사이의 랜덤 오프셋
+    }
+    
+    // 랜덤 방향 생성 (각도)
+    function getRandomDirection() {
+      return Math.random() * 360; // 0-359도 사이의 랜덤 각도
+    }
+    
+    // 랜덤 거리 생성
+    function getRandomDistance(min, max) {
+      return min + Math.random() * (max - min);
+    }
+    
+    // 별 엘리먼트 풀 생성
+    const sparklePool = [];
+    
+    // 별 생성 함수
+    function createSparkle() {
+      const sparkleDiv = document.createElement('div');
+      sparkleDiv.className = 'sparkle';
+      sparkleDiv.style.display = 'none';
+      container.appendChild(sparkleDiv);
+      sparklePool.push(sparkleDiv);
+      return sparkleDiv;
+    }
+    
+    // 초기 별 풀 생성
+    for (let i = 0; i < MAX_SPARKLES; i++) {
+      createSparkle();
+    }
+    
+    // 현재 활성화된 별 수 추적
+    let activeSparkleCount = 0;
+    
+    // 별 활성화 함수 - 특정 위치에서 특정 거리까지 이동
+    function activateSparkleAt(startX, startY, minDistance, maxDistance) {
+      // 이미 최대 별 개수에 도달했으면 리턴
+      if (activeSparkleCount >= MAX_SPARKLES) return;
+      
+      // 숨겨진 별 찾기
+      const hiddenSparkles = sparklePool.filter(sparkle => sparkle.style.display === 'none');
+      
+      // 사용 가능한 별이 없으면 리턴
+      if (hiddenSparkles.length === 0) return;
+      
+      // 활성 별 개수 증가
+      activeSparkleCount++;
+      
+      // 랜덤으로 숨겨진 별 하나 선택
+      const sparkleDiv = hiddenSparkles[Math.floor(Math.random() * hiddenSparkles.length)];
+      
+      // 랜덤 색상
+      const colorName = Object.keys(colors)[Math.floor(Math.random() * Object.keys(colors).length)];
+      const color = colors[colorName];
+      
+      // 랜덤 크기
+      const size = 12 + Math.random() * 36;
+      
+      // 랜덤 애니메이션 지속 시간
+      const animDuration = 1.2 + Math.random() * 0.6; // 1.2-1.8초
+      
+      // 별 HTML 설정 (innerHTML 한 번만 사용)
+      sparkleDiv.innerHTML = getStarSVGString(size, color);
+      
+      // Safari에서 svg 요소 직접 접근 (innerHTML 후 강제 리플로우를 위해)
+      if (isSafari) {
+        sparkleDiv.offsetHeight; // 강제 리플로우
+      }
+      
+      const starSVG = sparkleDiv.querySelector('svg');
+      
+      // 블러 효과 및 애니메이션 지속 시간 설정
+      sparkleDiv.style.setProperty('--blur-size', `${size * 0.33}px`);
+      sparkleDiv.style.setProperty('--color', color);
+      sparkleDiv.style.setProperty('--duration', `${animDuration}s`);
+      
+      // 시작 위치 근처의 미세 랜덤 오프셋 (4px 이내)
+      const startOffsetX = getRandomOffset(4);
+      const startOffsetY = getRandomOffset(4);
+      
+      // 랜덤 방향과 거리
+      const angle = getRandomDirection();
+      const distance = getRandomDistance(minDistance, maxDistance);
+      
+      // 목적지 계산
+      const endX = startX + startOffsetX + Math.cos(angle * Math.PI / 180) * distance;
+      const endY = startY + startOffsetY + Math.sin(angle * Math.PI / 180) * distance;
+      
+      // Safari에서 inline 스타일로 직접 적용 (CSS 변수 대신)
+      if (isSafari) {
+        starSVG.style.webkitAnimation = `continuousScale ${animDuration}s cubic-bezier(0.645, 0.045, 0.355, 1) forwards`;
+        starSVG.style.animation = `continuousScale ${animDuration}s cubic-bezier(0.645, 0.045, 0.355, 1) forwards`;
+      }
+      
+      // 시작 위치 설정 (requestAnimationFrame 사용)
+      requestAnimationFrame(() => {
+        sparkleDiv.style.left = `${startX + startOffsetX}px`;
+        sparkleDiv.style.top = `${startY + startOffsetY}px`;
+        sparkleDiv.style.display = 'block';
+        
+        // Safari에서 강제 리플로우를 한 번 더 수행
+        if (isSafari) {
+          sparkleDiv.offsetHeight;
+        }
+        
+        // 다음 프레임에서 이동 시작
+        requestAnimationFrame(() => {
+          sparkleDiv.style.left = `${endX}px`;
+          sparkleDiv.style.top = `${endY}px`;
+        });
+      });
+      
+      // 애니메이션 완료 후 제거
+      setTimeout(() => {
+        sparkleDiv.style.display = 'none';
+        activeSparkleCount--;
+      }, animDuration * 1000);
+    }
+    
+    // 일반 상황에서의 별 활성화 (커서 추적)
+    function activateSparkle() {
+      // 현재 포인터 위치 근처에서 별 생성 (12px 이내)
+      activateSparkleAt(pointerX, pointerY, 70, 140);
+    }
+    
+    // 다수의 별을 동시에 생성하는 함수
+    function createMultipleSparkles(count, isNormalMode = true) {
+      // 일반 모드일 경우 활성 별 제한 적용, 클릭/터치 모드일 경우 최대치까지 허용
+      const maxAllowed = isNormalMode ? NORMAL_MAX_ACTIVE : MAX_SPARKLES;
+      
+      // 최대 별 개수를 초과하지 않도록 제한
+      const actualCount = Math.min(count, maxAllowed - activeSparkleCount);
+      
+      if (actualCount <= 0) return;
+      
+      // 프레임 드롭 없이 여러 별 생성
+      let i = 0;
+      function createNextSparkle() {
+        if (i < actualCount) {
+          activateSparkle();
+          i++;
+          setTimeout(createNextSparkle, 10);  // 각 별 사이에 약간의 지연
+        }
+      }
+      createNextSparkle();
+    }
+    
+    // 특정 위치에서 대량의 별 생성 (클릭/터치 버스트)
+    function createClickBurst(x, y) {
+      // 별 버스트 개수
+      const burstCount = CLICK_BURST_COUNT;
+      
+      // 일반 별 생성 제한 임시 우회 (클릭 버스트용)
+      const batchSize = 16; // 한 번에 처리할 별 수
+      const batches = Math.ceil(burstCount / batchSize);
+      
+      for (let batch = 0; batch < batches; batch++) {
+        setTimeout(() => {
+          const remaining = Math.min(batchSize, burstCount - (batch * batchSize));
+          
+          for (let i = 0; i < remaining; i++) {
+            setTimeout(() => {
+              // 거리를 다양하게 설정 (3단계로 나누어 여러 층의 효과)
+              const distanceGroup = i % 3;
+              let minDist, maxDist;
+              
+              if (distanceGroup === 0) {
+                minDist = 50; maxDist = 100; // 가까운 거리
+              } else if (distanceGroup === 1) {
+                minDist = 100; maxDist = 150; // 중간 거리
+              } else {
+                minDist = 150; maxDist = 200; // 먼 거리
+              }
+              
+              activateSparkleAt(x, y, minDist, maxDist);
+            }, i * 5); // 각 별마다 약간의 시간차
+          }
+        }, batch * 50); // 각 배치마다 시간차
+      }
+    }
+    
+    // 생성 간격을 조절하는 변수
+    let lastSparkleTime = 0;
+    const SPARKLE_THROTTLE = 50; // 최소 50ms 간격
+    
+    // 자동 별 생성 (포인터 움직임이 없을 때도)
+    function startSparkleSystem() {
+      // requestAnimationFrame을 사용한 성능 최적화
+      function autoCreateSparkles(timestamp) {
+        if (timestamp - lastSparkleTime > 100 + Math.random() * 200) {
+          const burstCount = 1 + Math.floor(Math.random() * 2);
+          createMultipleSparkles(burstCount);
+          lastSparkleTime = timestamp;
+        }
+        requestAnimationFrame(autoCreateSparkles);
+      }
+      requestAnimationFrame(autoCreateSparkles);
+    }
+    
+    // 마우스 움직임에 따른 별 생성 - 스로틀링 적용
+    document.addEventListener('mousemove', (e) => {
+      const now = performance.now();
+      if (now - lastSparkleTime < SPARKLE_THROTTLE) return;
+      
+      lastSparkleTime = now;
+      
+      // 마우스를 움직일 때마다 별 생성
+      if (Math.random() > 0.4) { // 60% 확률로 별 생성
+        createMultipleSparkles(1);
+      }
+      
+      // 가끔 여러 개의 별 한번에 생성
+      if (Math.random() > 0.9) { // 10% 확률로 여러 별 생성
+        createMultipleSparkles(2 + Math.floor(Math.random() * 2));
+      }
+    });
+    
+    // 터치 움직임에 따른 별 생성 (모바일용)
+    document.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 0) return;
+      
+      const now = performance.now();
+      if (now - lastSparkleTime < SPARKLE_THROTTLE) return;
+      
+      lastSparkleTime = now;
+      
+      // 터치 움직일 때마다 별 생성
+      if (Math.random() > 0.4) { // 60% 확률로 별 생성
+        createMultipleSparkles(1);
+      }
+    });
+    
+    // 클릭 이벤트에 대한 별 생성
+    document.addEventListener('click', (e) => {
+      // 클릭 위치에서 64개의 별 한번에 생성
+      createClickBurst(e.clientX, e.clientY);
+    });
+    
+    // 터치 이벤트에 대한 별 생성 (모바일용)
+    document.addEventListener('touchstart', (e) => {
+      if (e.touches.length > 0) {
+        // 터치 위치에서 64개의 별 한번에 생성
+        createClickBurst(e.touches[0].clientX, e.touches[0].clientY);
+        e.preventDefault(); // 더블 탭 줌 방지
+      }
+    });
+    
+    // 페이지 로드 시 시작
+    window.onload = function() {
+      startSparkleSystem();
+    };
+  </script>
+</body>
+</html>

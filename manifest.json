@@ -11,7 +11,7 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["content.js", "collect-logs.js", "debug-fix.js"],
+      "js": ["content.js"],
       "css": ["styles.css"],
       "run_at": "document_idle"
     }
