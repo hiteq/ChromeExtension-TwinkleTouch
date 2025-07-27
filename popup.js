@@ -92,26 +92,35 @@ document.addEventListener('DOMContentLoaded', function() {
           console.log('✅ Wizard level saved:', selectedMode);
           
           // Send message to content script after storage save
-          chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
-            if (chrome.runtime.lastError || !tabs[0]) {
-              console.log('Tab query error:', chrome.runtime.lastError);
-              return;
+          // Background script에 활성화 요청
+          chrome.runtime.sendMessage({
+            action: 'activateOnCurrentTab'
+          }, function(response) {
+            if (chrome.runtime.lastError) {
+              console.log('Background script 통신 실패:', chrome.runtime.lastError.message);
+            } else if (response?.success) {
+              console.log('🎉 TwinkleTouch 활성화 성공');
+              
+              // 설정 동기화를 위해 탭에 메시지 전송
+              chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+                if (tabs[0]) {
+                  setTimeout(() => {
+                    chrome.tabs.sendMessage(tabs[0].id, {
+                      action: 'changeWizardMode',
+                      mode: selectedMode,
+                      effectLevel: wizardConfig[selectedMode].effectLevel,
+                      enabled: selectedMode !== 'muggle'
+                    }, function(syncResponse) {
+                      if (!chrome.runtime.lastError) {
+                        console.log('✅ 설정 동기화 완료:', syncResponse);
+                      }
+                    });
+                  }, 500);
+                }
+              });
+            } else {
+              console.log('TwinkleTouch 활성화 실패:', response?.error);
             }
-            
-            chrome.tabs.sendMessage(tabs[0].id, {
-              action: 'changeWizardMode',
-              mode: selectedMode,
-              effectLevel: wizardConfig[selectedMode].effectLevel,
-              enabled: selectedMode !== 'muggle'
-            }, function(response) {
-              if (chrome.runtime.lastError) {
-                console.log('⚠️ Content script not loaded, relying on storage sync');
-              } else if (response && response.success) {
-                console.log('✅ Wizard mode change confirmed:', response);
-              } else {
-                console.log('❌ Wizard mode change failed:', response);
-              }
-            });
           });
         });
       } catch (error) {

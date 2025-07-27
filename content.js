@@ -1,6 +1,12 @@
 // TwinkleTouch Chrome Extension - SVG DOM-based Content Script (마법사 등급 시스템)
 console.log('TwinkleTouch SVG DOM 마법사 등급 버전이 로드되었습니다!');
 
+// 중복 주입 방지 플래그
+if (window.twinkleTouchInitialized) {
+  console.log('TwinkleTouch가 이미 초기화되었습니다.');
+} else {
+  window.twinkleTouchInitialized = true;
+
 let isActive = true; // 기본값을 true로 설정
 let sparkleSystem = null;
 let effectLevel = 1.0; // 마법사 등급별 효과 강도 (0: 머글, 1.0: 대마법사)
@@ -853,4 +859,7 @@ if (document.readyState === 'loading') {
       window.testTwinkleEffect();
     }
   }, 3000);
+}
+
+// 중복 주입 방지 블록 종료
 }
