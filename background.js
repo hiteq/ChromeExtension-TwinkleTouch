@@ -6,9 +6,9 @@ chrome.runtime.onInstalled.addListener((details) => {
   
   // 기본 설정 초기화
   chrome.storage.sync.set({
-    wizardMode: 'archmage',
-    twinkleTouchEnabled: true,
-    effectLevel: 1.0
+    wizardMode: 'muggle',
+    twinkleTouchEnabled: false,
+    effectLevel: 0.0
   });
 });
 
@@ -82,22 +82,77 @@ async function injectTwinkleTouch(tabId) {
   }
 }
 
-// 탭 업데이트 시 자동 주입 (선택사항 - 사용자가 원할 때만)
+// 탭 업데이트 시 자동 주입
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.url) {
-    // 자동 주입은 하지 않고, 설정이 활성화된 경우에만 알림
-    const settings = await chrome.storage.sync.get(['twinkleTouchEnabled']);
-    if (settings.twinkleTouchEnabled) {
-      // 브라우저 액션 배지로 상태 표시
-      chrome.action.setBadgeText({
-        tabId: tabId,
-        text: '✨'
-      });
-      chrome.action.setBadgeBackgroundColor({
-        tabId: tabId,
-        color: '#6B46C1'
-      });
+  // 탭이 완전히 로드되었고, URL이 있고, chrome:// 페이지가 아닌 경우에만 처리
+  if (changeInfo.status === 'complete' && tab.url && !tab.url.startsWith('chrome://')) {
+    try {
+      // 설정 확인
+      const settings = await chrome.storage.sync.get(['twinkleTouchEnabled', 'wizardMode']);
+      
+      // 마법사 모드가 활성화되어 있고 머글이 아닌 경우에만 자동 주입
+      if (settings.twinkleTouchEnabled && settings.wizardMode !== 'muggle') {
+        console.log(`새 탭 감지: ${tab.url}, 자동 주입 시작`);
+        
+        // 약간의 지연을 두고 스크립트 주입 (DOM이 완전히 준비되도록)
+        setTimeout(async () => {
+          try {
+            await injectTwinkleTouch(tabId);
+            
+            // 브라우저 액션 배지로 상태 표시
+            chrome.action.setBadgeText({
+              tabId: tabId,
+              text: '✨'
+            });
+            chrome.action.setBadgeBackgroundColor({
+              tabId: tabId,
+              color: '#6B46C1'
+            });
+          } catch (injectError) {
+            console.error('스크립트 주입 실패:', injectError);
+          }
+        }, 100);
+        
+      } else {
+        console.log(`새 탭 감지: ${tab.url}, 설정에 따라 주입 건너뜀`);
+        // 배지 제거
+        chrome.action.setBadgeText({
+          tabId: tabId,
+          text: ''
+        });
+      }
+    } catch (error) {
+      console.error('탭 업데이트 처리 중 오류:', error);
     }
+  }
+});
+
+// 탭 활성화 시 자동 주입 (추가 보장)
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  try {
+    const tab = await chrome.tabs.get(activeInfo.tabId);
+    
+    // chrome:// 페이지가 아니고, URL이 있는 경우에만 처리
+    if (tab.url && !tab.url.startsWith('chrome://')) {
+      const settings = await chrome.storage.sync.get(['twinkleTouchEnabled', 'wizardMode']);
+      
+      if (settings.twinkleTouchEnabled && settings.wizardMode !== 'muggle') {
+        console.log(`탭 활성화 감지: ${tab.url}, 자동 주입 확인`);
+        
+        // 이미 주입되었는지 확인
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: activeInfo.tabId },
+          func: () => window.twinkleTouchInitialized === true
+        });
+        
+        if (!results[0]?.result) {
+          console.log('스크립트가 주입되지 않음, 자동 주입 시작');
+          await injectTwinkleTouch(activeInfo.tabId);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('탭 활성화 처리 중 오류:', error);
   }
 });
 

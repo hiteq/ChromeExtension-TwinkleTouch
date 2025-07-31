@@ -4,16 +4,29 @@ console.log('TwinkleTouch SVG DOM 마법사 등급 버전이 로드되었습니�
 // 중복 주입 방지 플래그
 if (window.twinkleTouchInitialized) {
   console.log('TwinkleTouch가 이미 초기화되었습니다.');
+  // 기존 시스템이 있으면 재활성화
+  if (window.sparkleSystem && window.isActive) {
+    console.log('기존 시스템 재활성화');
+    window.sparkleSystem.resumeAnimations();
+  }
 } else {
   window.twinkleTouchInitialized = true;
 
-let isActive = true; // 기본값을 true로 설정
-let sparkleSystem = null;
-let effectLevel = 1.0; // 마법사 등급별 효과 강도 (0: 머글, 1.0: 대마법사)
-let wizardMode = 'archmage'; // 현재 마법사 등급
+// 전역 변수들을 window 객체에 저장
+window.isActive = false; // 기본값을 false로 설정 (머글 모드)
+window.sparkleSystem = null;
+window.effectLevel = 0.0; // 마법사 등급별 효과 강도 (0: 머글, 1.0: 대마법사)
+window.wizardMode = 'muggle'; // 현재 마법사 등급
 
 // 중복 처리 방지를 위한 전역 플래그
-let isHandlingModeChange = false;
+window.isHandlingModeChange = false;
+
+// 로컬 변수로 참조
+let isActive = window.isActive;
+let sparkleSystem = window.sparkleSystem;
+let effectLevel = window.effectLevel;
+let wizardMode = window.wizardMode;
+let isHandlingModeChange = window.isHandlingModeChange;
 
 class SVGSparkleSystem {
   constructor() {
@@ -581,10 +594,15 @@ function setupMessageListener() {
           return;
         }
 
-        // 상태 업데이트
-        wizardMode = newWizardMode;
-        effectLevel = newEffectLevel;
-        isActive = newIsActive;
+        // 상태 업데이트 (전역 변수 동기화)
+        window.wizardMode = newWizardMode;
+        window.effectLevel = newEffectLevel;
+        window.isActive = newIsActive;
+        
+        // 로컬 변수 동기화
+        wizardMode = window.wizardMode;
+        effectLevel = window.effectLevel;
+        isActive = window.isActive;
 
         // 시스템 재초기화
         try {
@@ -635,24 +653,29 @@ function setupMessageListener() {
 // 설정 로드
 function loadSettings() {
   if (!checkChromeAPI()) {
-    isActive = true;
-    effectLevel = 1.0;
-    wizardMode = 'archmage';
-    initializeTwinkleEffect();
+    isActive = false;
+    effectLevel = 0.0;
+    wizardMode = 'muggle';
+    // 머글 모드에서는 초기화하지 않음
     return;
   }
 
   try {
     chrome.storage.sync.get(['wizardMode', 'effectLevel', 'twinkleTouchEnabled'], function(result) {
       if (chrome.runtime.lastError) {
-        console.log('저장소 읽기 오류:', chrome.runtime.lastError);
-        isActive = true;
-        effectLevel = 1.0;
-        wizardMode = 'archmage';
+            console.log('저장소 읽기 오류:', chrome.runtime.lastError);
+    isActive = false;
+    effectLevel = 0.0;
+    wizardMode = 'muggle';
       } else {
-        wizardMode = result.wizardMode || 'archmage';
-        effectLevel = result.effectLevel !== undefined ? result.effectLevel : 1.0;
-        isActive = result.twinkleTouchEnabled !== false && wizardMode !== 'muggle';
+        window.wizardMode = result.wizardMode || 'muggle';
+        window.effectLevel = result.effectLevel !== undefined ? result.effectLevel : 0.0;
+        window.isActive = result.twinkleTouchEnabled !== false && window.wizardMode !== 'muggle';
+        
+        // 로컬 변수 동기화
+        wizardMode = window.wizardMode;
+        effectLevel = window.effectLevel;
+        isActive = window.isActive;
       }
 
       console.log(`마법사 등급: ${wizardMode}, 효과 강도: ${effectLevel}, 활성화: ${isActive}`);
@@ -663,10 +686,10 @@ function loadSettings() {
     });
   } catch (error) {
     console.log('저장소 접근 오류:', error);
-    isActive = true;
-    effectLevel = 1.0;
-    wizardMode = 'archmage';
-    initializeTwinkleEffect();
+    isActive = false;
+    effectLevel = 0.0;
+    wizardMode = 'muggle';
+    // 머글 모드에서는 초기화하지 않음
   }
 }
 
@@ -712,10 +735,15 @@ function setupStorageListener() {
           
           console.log(`📦 저장소 변경 감지: ${wizardMode}→${newWizardMode}, 효과: ${effectLevel}→${newEffectLevel}, 활성화: ${isActive}→${newIsActive}`);
           
-          // 상태 업데이트
-          wizardMode = newWizardMode;
-          effectLevel = newEffectLevel;
-          isActive = newIsActive;
+          // 상태 업데이트 (전역 변수 동기화)
+          window.wizardMode = newWizardMode;
+          window.effectLevel = newEffectLevel;
+          window.isActive = newIsActive;
+          
+          // 로컬 변수 동기화
+          wizardMode = window.wizardMode;
+          effectLevel = window.effectLevel;
+          isActive = window.isActive;
           
           // 시스템 재초기화
           try {
@@ -770,6 +798,7 @@ function initializeTwinkleEffect() {
     // 새로운 시스템 생성
     console.log('새로운 SVGSparkleSystem 생성 중...');
     sparkleSystem = new SVGSparkleSystem();
+    window.sparkleSystem = sparkleSystem;
     
     console.log('SVGSparkleSystem 초기화 중...');
     sparkleSystem.init();
@@ -834,32 +863,37 @@ window.testTwinkleEffect = function() {
 // 초기화
 setupMessageListener();
 
-// DOM 로드 후 실행
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', function() {
-    loadSettings();
-    setupStorageListener();
-    
-    // 3초 후 자동 테스트
-    setTimeout(() => {
-      console.log('🔄 자동 테스트 실행');
-      if (window.testTwinkleEffect) {
-        window.testTwinkleEffect();
-      }
-    }, 3000);
-  });
-} else {
+// 즉시 실행 함수
+function initializeImmediately() {
+  console.log('🚀 TwinkleTouch 즉시 초기화 시작');
   loadSettings();
   setupStorageListener();
   
-  // 3초 후 자동 테스트
+  // 1초 후 자동 테스트 (더 빠른 응답)
   setTimeout(() => {
     console.log('🔄 자동 테스트 실행');
     if (window.testTwinkleEffect) {
       window.testTwinkleEffect();
     }
-  }, 3000);
+  }, 1000);
 }
+
+// DOM 로드 후 실행
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeImmediately);
+} else {
+  // DOM이 이미 로드된 경우 즉시 실행
+  initializeImmediately();
+}
+
+// 추가 보장: window load 이벤트 후에도 확인
+window.addEventListener('load', () => {
+  console.log('📄 Window load 이벤트 - TwinkleTouch 상태 확인');
+  if (window.isActive && !window.sparkleSystem) {
+    console.log('🔄 Window load 후 재초기화');
+    initializeTwinkleEffect();
+  }
+});
 
 // 중복 주입 방지 블록 종료
 }

@@ -43,16 +43,16 @@ document.addEventListener('DOMContentLoaded', function() {
       chrome.storage.sync.get(['wizardMode'], function(result) {
         if (chrome.runtime.lastError) {
           console.log('Storage read error:', chrome.runtime.lastError);
-          updateUI('archmage');
+          updateUI('muggle');
           return;
         }
-        const currentMode = result.wizardMode || 'archmage'; // Default to archmage
+        const currentMode = result.wizardMode || 'muggle'; // Default to muggle
         updateUI(currentMode);
       });
-    } catch (error) {
-      console.log('Storage access error:', error);
-      updateUI('archmage');
-    }
+            } catch (error) {
+          console.log('Storage access error:', error);
+          updateUI('muggle');
+        }
   }
   
   loadCurrentSettings();
