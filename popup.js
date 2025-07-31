@@ -97,9 +97,9 @@ document.addEventListener('DOMContentLoaded', function() {
             action: 'activateOnCurrentTab'
           }, function(response) {
             if (chrome.runtime.lastError) {
-              console.log('Background script 통신 실패:', chrome.runtime.lastError.message);
+              console.log('Background script communication failed:', chrome.runtime.lastError.message);
             } else if (response?.success) {
-              console.log('🎉 TwinkleTouch 활성화 성공');
+              console.log('🎉 TwinkleTouch activation successful');
               
               // 설정 동기화를 위해 탭에 메시지 전송
               chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
@@ -112,14 +112,14 @@ document.addEventListener('DOMContentLoaded', function() {
                       enabled: selectedMode !== 'muggle'
                     }, function(syncResponse) {
                       if (!chrome.runtime.lastError) {
-                        console.log('✅ 설정 동기화 완료:', syncResponse);
+                        console.log('✅ Settings synchronization complete:', syncResponse);
                       }
                     });
                   }, 500);
                 }
               });
             } else {
-              console.log('TwinkleTouch 활성화 실패:', response?.error);
+              console.log('TwinkleTouch activation failed:', response?.error);
             }
           });
         });
