@@ -8,10 +8,10 @@ const os = require('os');
  */
 async function createExtensionContext(options = {}) {
   const extensionPath = path.join(__dirname, '..');
-  
+
   // 임시 사용자 데이터 디렉토리 생성
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'playwright-extension-'));
-  
+
   try {
     // launchPersistentContext 사용으로 변경
     const context = await chromium.launchPersistentContext(userDataDir, {
@@ -38,7 +38,7 @@ async function createExtensionContext(options = {}) {
     const page = pages.length > 0 ? pages[0] : await context.newPage();
 
     return { context, page, userDataDir };
-    
+
   } catch (error) {
     // 실패 시 임시 디렉토리 정리
     if (fs.existsSync(userDataDir)) {
@@ -53,29 +53,29 @@ async function createExtensionContext(options = {}) {
  */
 export async function createExtensionPage(context, url = 'https://example.com') {
   const page = await context.newPage();
-  
+
   // Extension 로딩 로그 수집
   page.on('console', msg => {
-    if (msg.text().includes('TwinkleTouch') || 
-        msg.text().includes('Extension') || 
+    if (msg.text().includes('TwinkleTouch') ||
+        msg.text().includes('Extension') ||
         msg.text().includes('마법사') ||
         msg.text().includes('sparkle')) {
       console.log(`[페이지 로그] ${msg.text()}`);
     }
   });
-  
+
   // 네트워크 오류 로깅
   page.on('pageerror', error => {
     console.log(`[페이지 오류] ${error.message}`);
   });
-  
+
   // 테스트 페이지로 이동
   await page.goto(url);
   console.log(`페이지 로드됨: ${url}`);
-  
+
   // Extension 초기화 대기
   await page.waitForTimeout(3000);
-  
+
   return page;
 }
 
@@ -129,10 +129,10 @@ async function verifyExtensionLoaded(page) {
 async function injectContentScript(page) {
   try {
     console.log('Content script를 수동으로 주입합니다...');
-    
+
     const contentScriptPath = path.join(__dirname, '..', 'content.js');
     const contentScript = fs.readFileSync(contentScriptPath, 'utf8');
-    
+
     await page.addScriptTag({
       content: contentScript
     });
@@ -160,7 +160,7 @@ async function injectContentScript(page) {
 async function forceExtensionInitialization(page) {
   try {
     console.log('Extension 강제 초기화를 시작합니다...');
-    
+
     await page.evaluate(() => {
       // 기존 캔버스 제거
       const existingCanvas = document.querySelector('#twinkle-canvas');
@@ -210,4 +210,4 @@ module.exports = {
   injectContentScript,
   forceExtensionInitialization,
   cleanupUserDataDir
-}; 
+};

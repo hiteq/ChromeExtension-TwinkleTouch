@@ -9,10 +9,10 @@ test.describe('TwinkleTouch 디버그 테스트', () => {
   test.beforeAll(async ({ browser }) => {
     // 일반 페이지 생성
     page = await browser.newPage();
-    
+
     // 테스트 페이지로 이동
     await page.goto('https://www.example.com');
-    
+
     // 디버그 스크립트 주입
     const debugScript = `
       // 기본 변수 설정
@@ -68,23 +68,23 @@ test.describe('TwinkleTouch 디버그 테스트', () => {
       document.body.appendChild(canvas);
       console.log('캔버스 생성 완료');
     `;
-    
+
     await page.addScriptTag({ content: debugScript });
-    
+
     // debug-fix.js 파일 주입
     try {
       const debugFixPath = path.join(__dirname, '..', 'debug-fix.js');
       const debugFix = fs.readFileSync(debugFixPath, 'utf8');
-      
+
       await page.addScriptTag({
         content: debugFix
       });
-      
+
       console.log('debug-fix.js 파일 주입 완료');
     } catch (error) {
       console.error('debug-fix.js 파일 주입 실패:', error);
     }
-    
+
     // 초기화 대기
     await page.waitForTimeout(1000);
   });
@@ -93,7 +93,7 @@ test.describe('TwinkleTouch 디버그 테스트', () => {
     const canvasExists = await page.evaluate(() => {
       return document.querySelector('#twinkle-canvas') !== null;
     });
-    
+
     expect(canvasExists).toBeTruthy();
   });
 
@@ -101,7 +101,7 @@ test.describe('TwinkleTouch 디버그 테스트', () => {
     const testFunctionExists = await page.evaluate(() => {
       return typeof window.testTwinkleEffect === 'function';
     });
-    
+
     expect(testFunctionExists).toBeTruthy();
   });
 
@@ -111,19 +111,19 @@ test.describe('TwinkleTouch 디버그 테스트', () => {
       const beforeCount = window.sparkleSystem.activeSparkleCount;
       window.testTwinkleEffect();
       const afterCount = window.sparkleSystem.activeSparkleCount;
-      
+
       return {
         beforeCount,
         afterCount,
         success: afterCount > beforeCount
       };
     });
-    
+
     console.log('마법 효과 테스트 결과:', result);
-    
+
     // 스크린샷 촬영
     await page.screenshot({ path: 'tests/screenshots/magic-effect-test.png' });
-    
+
     expect(result.success).toBeTruthy();
   });
 
@@ -134,7 +134,7 @@ test.describe('TwinkleTouch 디버그 테스트', () => {
       const oldMode = window.wizardMode;
       window.wizardMode = 'apprentice';
       window.effectLevel = 0.33;
-      
+
       return {
         oldMode,
         newMode: window.wizardMode,
@@ -142,9 +142,9 @@ test.describe('TwinkleTouch 디버그 테스트', () => {
         success: window.wizardMode === 'apprentice' && window.effectLevel === 0.33
       };
     });
-    
+
     console.log('모드 변경 테스트 결과:', result);
-    
+
     expect(result.success).toBeTruthy();
   });
 
@@ -155,12 +155,12 @@ test.describe('TwinkleTouch 디버그 테스트', () => {
       window.wizardMode = 'muggle';
       window.effectLevel = 0;
       window.isActive = false;
-      
+
       // 클릭 시뮬레이션
       const beforeCount = window.sparkleSystem.activeSparkleCount;
       window.testTwinkleEffect();
       const afterCount = window.sparkleSystem.activeSparkleCount;
-      
+
       return {
         wizardMode: window.wizardMode,
         isActive: window.isActive,
@@ -169,9 +169,9 @@ test.describe('TwinkleTouch 디버그 테스트', () => {
         success: window.wizardMode === 'muggle' && window.isActive === false
       };
     });
-    
+
     console.log('머글 모드 테스트 결과:', result);
-    
+
     expect(result.success).toBeTruthy();
   });
 
@@ -182,24 +182,24 @@ test.describe('TwinkleTouch 디버그 테스트', () => {
       window.wizardMode = 'archmage';
       window.effectLevel = 1.0;
       window.isActive = true;
-      
+
       // 페이지 숨김 시뮬레이션
       window.sparkleSystem.pauseAnimations();
       const isPaused = window.sparkleSystem.isPaused;
-      
+
       // 페이지 표시 시뮬레이션
       window.sparkleSystem.resumeAnimations();
       const isResumed = !window.sparkleSystem.isPaused;
-      
+
       return {
         isPaused,
         isResumed,
         success: isPaused && isResumed
       };
     });
-    
+
     console.log('페이지 가시성 테스트 결과:', result);
-    
+
     expect(result.success).toBeTruthy();
   });
 
@@ -214,12 +214,12 @@ test.describe('TwinkleTouch 디버그 테스트', () => {
         activeSparkles: window.sparkleSystem ? window.sparkleSystem.activeSparkleCount : 0
       };
     });
-    
+
     console.log('최종 상태:', finalState);
-    
+
     // 스크린샷 촬영
     await page.screenshot({ path: 'tests/screenshots/final-state.png' });
-    
+
     await page.close();
   });
 });

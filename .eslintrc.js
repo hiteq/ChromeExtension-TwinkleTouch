@@ -50,7 +50,7 @@ module.exports = {
     'no-implicit-globals': 'off', // Content script는 전역 스코프 사용
     
     // 성능 관련
-    'no-inner-declarations': 'warn',
+    'no-inner-declarations': 'off', // Chrome Extension에서는 함수를 조건부로 선언할 수 있음
     'prefer-const': 'warn',
     'no-var': 'warn',
     
@@ -68,6 +68,10 @@ module.exports = {
       env: {
         node: true,
         jest: true
+      },
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module'
       },
       globals: {
         test: 'readonly',

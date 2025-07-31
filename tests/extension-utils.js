@@ -12,7 +12,7 @@ export class ExtensionTestUtils {
    */
   async isExtensionLoaded() {
     return await this.page.evaluate(() => {
-      return typeof window.sparkleSystem !== 'undefined' || 
+      return typeof window.sparkleSystem !== 'undefined' ||
              document.querySelector('#twinkle-canvas') !== null ||
              typeof window.initializeTwinkleEffect !== 'undefined';
     });
@@ -25,20 +25,20 @@ export class ExtensionTestUtils {
     await this.page.evaluate(({ mode, effectLevel }) => {
       window.wizardMode = mode;
       window.effectLevel = effectLevel;
-      
+
       if (mode === 'muggle') {
         window.isActive = false;
       } else {
         window.isActive = true;
       }
-      
+
       if (window.initializeTwinkleEffect) {
         window.initializeTwinkleEffect();
       }
-      
+
       console.log(`마법사 모드 변경: ${mode} (효과 레벨: ${effectLevel})`);
     }, { mode, effectLevel });
-    
+
     await this.page.waitForTimeout(500);
   }
 
@@ -66,14 +66,14 @@ export class ExtensionTestUtils {
   async randomClick(viewport) {
     const x = Math.random() * viewport.width;
     const y = Math.random() * viewport.height;
-    
+
     console.log(`랜덤 클릭: (${Math.round(x)}, ${Math.round(y)})`);
-    
+
     const beforeState = await this.getCanvasState();
     await this.page.mouse.click(x, y);
     await this.page.waitForTimeout(300);
     const afterState = await this.getCanvasState();
-    
+
     return {
       position: { x: Math.round(x), y: Math.round(y) },
       beforeState,
@@ -87,18 +87,18 @@ export class ExtensionTestUtils {
    */
   async performRandomClicks(count, viewport) {
     const results = [];
-    
+
     for (let i = 0; i < count; i++) {
       const result = await this.randomClick(viewport);
       results.push({
         clickNumber: i + 1,
         ...result
       });
-      
+
       // 다음 클릭 전 대기
       await this.page.waitForTimeout(500);
     }
-    
+
     return results;
   }
 
@@ -107,25 +107,25 @@ export class ExtensionTestUtils {
    */
   async traceMousePath(points) {
     const results = [];
-    
+
     for (const point of points) {
       const beforeState = await this.getCanvasState();
-      
+
       await this.page.mouse.move(point.x, point.y);
       await this.page.waitForTimeout(200);
-      
+
       const afterState = await this.getCanvasState();
-      
+
       results.push({
         position: point,
         beforeState,
         afterState,
         particlesGenerated: afterState.activeSparkles - beforeState.activeSparkles
       });
-      
+
       console.log(`마우스 이동: (${point.x}, ${point.y}) - 파티클: ${afterState.activeSparkles}`);
     }
-    
+
     return results;
   }
 
@@ -147,7 +147,7 @@ export class ExtensionTestUtils {
           frameRate: window.sparkleSystem.currentFPS || 0
         } : null
       };
-      
+
       return metrics;
     });
   }
@@ -168,12 +168,12 @@ export class ExtensionTestUtils {
   async takeDebugScreenshot(name) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `tests/screenshots/debug-${name}-${timestamp}.png`;
-    
-    await this.page.screenshot({ 
+
+    await this.page.screenshot({
       path: filename,
-      fullPage: true 
+      fullPage: true
     });
-    
+
     console.log(`디버그 스크린샷 저장: ${filename}`);
     return filename;
   }
@@ -190,8 +190,8 @@ export class ExtensionTestUtils {
       performanceMetrics: await this.collectPerformanceMetrics(),
       results
     };
-    
+
     console.log('테스트 리포트:', JSON.stringify(report, null, 2));
     return report;
   }
-} 
+}

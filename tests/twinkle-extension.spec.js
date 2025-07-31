@@ -7,10 +7,10 @@ test.describe('TwinkleTouch 기본 테스트', () => {
   test.beforeAll(async ({ browser }) => {
     // 일반 페이지 생성
     page = await browser.newPage();
-    
+
     // 테스트 페이지로 이동
     await page.goto('https://www.example.com');
-    
+
     // 간단한 테스트 스크립트 주입
     await page.addScriptTag({
       content: `
@@ -65,7 +65,7 @@ test.describe('TwinkleTouch 기본 테스트', () => {
         console.log('TwinkleTouch 테스트 환경 준비 완료');
       `
     });
-    
+
     // 초기화 대기
     await page.waitForTimeout(1000);
   });
@@ -74,7 +74,7 @@ test.describe('TwinkleTouch 기본 테스트', () => {
     const canvasExists = await page.evaluate(() => {
       return document.querySelector('#twinkle-canvas') !== null;
     });
-    
+
     expect(canvasExists).toBeTruthy();
   });
 
@@ -82,7 +82,7 @@ test.describe('TwinkleTouch 기본 테스트', () => {
     const testFunctionExists = await page.evaluate(() => {
       return typeof window.testTwinkleEffect === 'function';
     });
-    
+
     expect(testFunctionExists).toBeTruthy();
   });
 
@@ -91,12 +91,12 @@ test.describe('TwinkleTouch 기본 테스트', () => {
     const result = await page.evaluate(() => {
       return window.testTwinkleEffect();
     });
-    
+
     console.log('마법 효과 테스트 결과:', result);
-    
+
     // 스크린샷 촬영
     await page.screenshot({ path: 'tests/screenshots/twinkle-effect.png' });
-    
+
     expect(result).toBeTruthy();
   });
 
@@ -107,7 +107,7 @@ test.describe('TwinkleTouch 기본 테스트', () => {
       const oldMode = window.wizardMode;
       window.wizardMode = 'apprentice';
       window.effectLevel = 0.33;
-      
+
       return {
         oldMode,
         newMode: window.wizardMode,
@@ -115,9 +115,9 @@ test.describe('TwinkleTouch 기본 테스트', () => {
         success: window.wizardMode === 'apprentice' && window.effectLevel === 0.33
       };
     });
-    
+
     console.log('모드 변경 테스트 결과:', result);
-    
+
     expect(result.success).toBeTruthy();
   });
 
@@ -131,9 +131,9 @@ test.describe('TwinkleTouch 기본 테스트', () => {
         hasCanvas: document.querySelector('#twinkle-canvas') !== null
       };
     });
-    
+
     console.log('최종 상태:', finalState);
-    
+
     await page.close();
   });
 });
