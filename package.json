@@ -32,7 +32,7 @@
   "author": "TwinkleTouch Team",
   "license": "MIT",
   "devDependencies": {
-    "@playwright/test": "^1.53.2",
+    "@playwright/test": "^1.56.1",
     "@types/node": "^24.1.0",
     "@types/react": "^19.1.9",
     "@types/react-dom": "^19.1.7",
@@ -41,7 +41,7 @@
     "chokidar": "^4.0.3",
     "eslint": "^8.57.0",
     "open": "^10.2.0",
-    "playwright": "^1.53.2",
+    "playwright": "^1.56.1",
     "postcss": "^8.5.6",
     "shadcn-ui": "^0.9.5",
     "tailwindcss": "^4.1.11",
