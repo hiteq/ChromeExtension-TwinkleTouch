@@ -12,7 +12,7 @@
 
     body {
       width: 320px;
-      height: 240px;
+      min-height: 240px;
       padding: 0;
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
@@ -135,6 +135,9 @@
       text-align: center;
       border-top: 1px solid light-dark(#e5e5e5, #2a2a2a);
       background: light-dark(#fafafa, #111111);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     .credits {
@@ -151,6 +154,38 @@
 
     .credits a:hover {
       text-decoration: underline;
+    }
+
+    /* Buy Me a Coffee Button */
+    .bmc-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background-color: #FFDD00;
+      color: #000000;
+      padding: 8px 16px;
+      border-radius: 20px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 12px;
+      margin-top: 12px;
+      transition: all 0.2s ease;
+      border: 1px solid rgba(0,0,0,0.05);
+      width: fit-content;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .bmc-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+      background-color: #FFEA00;
+    }
+
+    .bmc-button:active {
+      transform: translateY(0);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
 
     /* 반응형 애니메이션 */
@@ -223,6 +258,9 @@
       <br>
       Inspired from <a href="https://x.com/cmzw_" target="_blank" rel="noopener noreferrer">celestialmaze</a>
     </div>
+    <a href="https://www.buymeacoffee.com/" target="_blank" rel="noopener noreferrer" class="bmc-button" aria-label="Buy me a coffee">
+      <span>☕</span> Buy me a coffee
+    </a>
   </div>
 
   <script src="popup.js"></script>
