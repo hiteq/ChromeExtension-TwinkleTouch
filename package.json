@@ -1,6 +1,6 @@
 {
   "name": "twinkletouch-chromeextension",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "화면에 마우스 추적 및 클릭 효과로 반짝이는 별들을 표시하는 크롬 익스텐션입니다.",
   "main": "content.js",
   "scripts": {
