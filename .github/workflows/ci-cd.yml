@@ -226,6 +226,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test, version-bump, build]
     if: needs.version-bump.outputs.version-changed == 'true'
+    permissions:
+      contents: write
     
     steps:
     - name: 코드 체크아웃
@@ -239,26 +241,26 @@ jobs:
         name: twinkle-touch-extension-v${{ needs.version-bump.outputs.new-version }}
         path: ./release
         
-    - name: GitHub 릴리스 생성
-      uses: actions/create-release@v1
+    - name: GitHub 릴리스 생성 및 ZIP 첨부
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: v${{ needs.version-bump.outputs.new-version }}
-        release_name: TwinkleTouch Extension v${{ needs.version-bump.outputs.new-version }}
-        body_path: ./release/RELEASE_NOTES.md
-        draft: false
-        prerelease: false
-        
-    - name: 릴리스에 Extension ZIP 첨부
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./release/twinkle-touch-extension.zip
-        asset_name: twinkle-touch-extension-v${{ needs.version-bump.outputs.new-version }}.zip
-        asset_content_type: application/zip
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        VERSION: ${{ needs.version-bump.outputs.new-version }}
+      run: |
+        TAG="v${VERSION}"
+        TITLE="TwinkleTouch Extension v${VERSION}"
+        ASSET="./release/twinkle-touch-extension-v${VERSION}.zip"
+
+        cp ./release/twinkle-touch-extension.zip "${ASSET}"
+
+        if gh release view "${TAG}" >/dev/null 2>&1; then
+          gh release edit "${TAG}" --title "${TITLE}" --notes-file ./release/RELEASE_NOTES.md
+          gh release upload "${TAG}" "${ASSET}" --clobber
+        else
+          gh release create "${TAG}" "${ASSET}" \
+            --title "${TITLE}" \
+            --notes-file ./release/RELEASE_NOTES.md \
+            --target "$(git rev-parse HEAD)"
+        fi
 
   # Chrome Web Store 자동 배포 (선택적)
   chrome-webstore-deploy:
@@ -384,4 +386,4 @@ jobs:
       run: |
         git checkout develop || git checkout -b develop
         git merge main --no-edit
-        git push origin develop 
+        git push origin develop
